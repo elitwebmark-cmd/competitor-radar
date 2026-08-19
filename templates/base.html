@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Competitor Radar{% endblock %}</title>
+<style>
+:root{
+  --bg:#0d0d0f; --card:#161619; --card2:#1d1d22; --line:#2a2a31;
+  --tx:#f2f2f4; --mute:#8b8b93; --mute2:#c7c7cf;
+  --red:#FD3A1F; --green:#28C76F; --gold:#FFC85A; --blue:#4c9ffe;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:15px;line-height:1.5}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1200px;margin:0 auto;padding:20px 22px 60px}
+header{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:rgba(13,13,15,.92);backdrop-filter:blur(8px);z-index:10}
+.logo{font-weight:900;font-size:19px;letter-spacing:.3px}
+.logo b{color:var(--red)}
+.logo span{color:var(--mute);font-weight:700;font-size:13px;margin-left:6px}
+header .sp{flex:1}
+.hlink{color:var(--mute2);font-weight:700;font-size:13px;padding:7px 12px;border-radius:8px}
+.hlink:hover{background:var(--card)}
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--red);color:#fff;border:none;
+  border-radius:9px;font-size:14px;font-weight:800;padding:9px 16px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:var(--card2);color:var(--mute2);border:1px solid var(--line)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;
+  padding:3px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px}
+.pill.on{background:rgba(40,199,111,.16);color:var(--green)}
+.pill.off{background:rgba(139,139,147,.16);color:var(--mute)}
+.pill.started{background:rgba(40,199,111,.16);color:var(--green)}
+.pill.stopped{background:rgba(253,58,31,.16);color:var(--red)}
+.pill.new{background:rgba(76,159,254,.16);color:var(--blue)}
+.badge{display:inline-block;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;
+  background:var(--card2);color:var(--mute2);border:1px solid var(--line);margin:2px 3px 0 0}
+.mut{color:var(--mute)}
+.small{font-size:12px}
+.up{color:var(--green);font-weight:800}
+.down{color:var(--red);font-weight:800}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<header>
+  <div class="logo"><b>Competitor</b> Radar <span>· моніторинг реклами</span></div>
+  <div class="sp"></div>
+  {% if session.get('auth') %}
+  <a class="hlink" href="{{ url_for('dashboard') }}">Дашборд</a>
+  <a class="hlink" href="{{ url_for('logout') }}">Вийти</a>
+  {% endif %}
+</header>
+<div class="wrap">
+{% block body %}{% endblock %}
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ domain }} · Competitor Radar{% endblock %}
+{% block head %}
+<style>
+.crumb{color:var(--mute);font-size:13px;font-weight:700;margin:4px 0 14px}
+.crumb a:hover{color:var(--gold)}
+h1.dh{font-size:24px;margin:0 0 4px}
+.chan{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin:16px 0}
+.chan h2{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.chan .meta{color:var(--mute);font-size:13px;font-weight:700;margin-bottom:12px}
+.stat{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0 14px}
+.stat b{font-size:22px;font-weight:900}
+.stat .l{color:var(--mute);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.cr{background:var(--card2);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.cr .thumb{aspect-ratio:1/1;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.cr .thumb img{width:100%;height:100%;object-fit:cover}
+.cr .vid{font-size:30px;color:var(--mute)}
+.cr .body{padding:9px 11px;display:flex;flex-direction:column;gap:6px;flex:1}
+.cr .txt{font-size:12.5px;color:var(--mute2);line-height:1.45;font-weight:600}
+.cr .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:auto}
+.cr .cta{font-size:11px;font-weight:800;color:var(--gold)}
+.cr a.open{font-size:11px;font-weight:800;color:var(--blue)}
+.off{color:var(--mute);font-weight:700;padding:10px 0}
+.linkbtn{display:inline-block;font-size:12px;font-weight:800;color:var(--blue);margin-left:auto}
+</style>
+{% endblock %}
+{% block body %}
+<div class="crumb"><a href="{{ url_for('dashboard') }}">← Дашборд</a> · зріз {{ snap_date }} UTC</div>
+<h1 class="dh">{{ domain }}</h1>
+
+{% macro gallery(items, kind) %}
+  {% if items %}
+  <div class="gal">
+    {% for c in items %}
+    <div class="cr">
+      <div class="thumb">
+        {% if c.image %}<img src="{{ c.image }}" loading="lazy" alt="">
+        {% elif c.video %}<span class="vid">▶</span>
+        {% else %}<span class="vid">🖼️</span>{% endif %}
+      </div>
+      <div class="body">
+        {% if c.text %}<div class="txt">{{ c.text[:200] }}</div>{% endif %}
+        <div class="row">
+          {% if c.cta %}<span class="cta">{{ c.cta }}</span>{% endif %}
+          {% if c.format %}<span class="badge">{{ c.format }}</span>{% endif %}
+          {% for p in (c.platforms or []) %}<span class="badge">{{ p }}</span>{% endfor %}
+          {% if c.start %}<span class="small mut">{{ c.start }}</span>{% endif %}
+          {% if c.link %}<a class="open" href="{{ c.link }}" target="_blank" rel="noopener">відкрити →</a>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<div class="off">Немає прев'ю креативів для показу.</div>{% endif %}
+{% endmacro %}
+
+{% set g = rec.google or {} %}
+<div class="chan">
+  <h2>🔍 Google Ads {% if g.running %}<span class="pill on">● крутить</span>{% else %}<span class="pill off">○ нема реклами</span>{% endif %}
+    {% if g.link %}<a class="linkbtn" href="{{ g.link }}" target="_blank" rel="noopener">Google Ads Transparency →</a>{% endif %}</h2>
+  {% if g.running %}
+  <div class="stat">
+    <div><b>{{ g.count }}</b><div class="l">оголошень{% if g.period_days %} / {{ g.period_days }} дн.{% endif %}</div></div>
+    {% if g.formats %}<div><b>{{ g.formats.get('text',0) }}·{{ g.formats.get('image',0) }}·{{ g.formats.get('video',0) }}</b><div class="l">пошук · банер · відео</div></div>{% endif %}
+  </div>
+  {% if g.platforms %}<div style="margin-bottom:12px">{% for k,v in g.platforms.items() %}{% if v %}<span class="badge">{{ g.platform_labels.get(k,k) }} {{ v }}</span>{% endif %}{% endfor %}</div>{% endif %}
+  {{ gallery(g.creatives, 'google') }}
+  {% else %}<div class="off">{{ g.note or 'Зараз не крутить контекстну рекламу.' }}</div>{% endif %}
+</div>
+
+{% set m = rec.meta or {} %}
+<div class="chan">
+  <h2>📘 Meta · Facebook / Instagram {% if m.running %}<span class="pill on">● крутить</span>{% else %}<span class="pill off">○ нема реклами</span>{% endif %}
+    {% if m.link %}<a class="linkbtn" href="{{ m.link }}" target="_blank" rel="noopener">Meta Ad Library →</a>{% endif %}</h2>
+  {% if m.page %}<div class="meta">сторінка: {{ m.page }}{% if m.by_keyword %} · пошук за ключем (можливі чужі крео)</div>{% else %}</div>{% endif %}{% endif %}
+  {% if m.running %}
+  <div class="stat">
+    <div><b>{{ m.count }}</b><div class="l">активних крео</div></div>
+  </div>
+  {% if m.platforms %}<div style="margin-bottom:12px">{% for k,v in m.platforms.items() %}{% if v %}<span class="badge">{{ {'facebook':'Facebook','instagram':'Instagram','messenger':'Messenger','audience_network':'Audience Net'}.get(k,k) }} {{ v }}</span>{% endif %}{% endfor %}</div>{% endif %}
+  {{ gallery(m.creatives, 'meta') }}
+  {% else %}<div class="off">{{ m.note or 'Зараз не крутить рекламу в Meta.' }}</div>{% endif %}
+</div>
+
+{% endblock %}

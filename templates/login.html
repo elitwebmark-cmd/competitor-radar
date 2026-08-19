@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Вхід · Competitor Radar{% endblock %}
+{% block body %}
+<div style="max-width:340px;margin:8vh auto 0">
+  <h2 style="font-size:20px;margin:0 0 4px">Вхід</h2>
+  <p class="mut small" style="margin:0 0 18px">Моніторинг рекламної активності конкурентів</p>
+  {% if err %}<div style="background:rgba(253,58,31,.14);color:var(--red);font-weight:700;
+       padding:10px 12px;border-radius:9px;font-size:13px;margin-bottom:12px">{{ err }}</div>{% endif %}
+  <form method="post">
+    <input name="login" placeholder="Логін" autocomplete="username" required
+      style="width:100%;background:var(--card2);border:1px solid var(--line);border-radius:9px;
+      color:var(--tx);padding:11px 13px;font-size:14px;font-weight:700;margin-bottom:10px;outline:none">
+    <input name="password" type="password" placeholder="Пароль" autocomplete="current-password" required
+      style="width:100%;background:var(--card2);border:1px solid var(--line);border-radius:9px;
+      color:var(--tx);padding:11px 13px;font-size:14px;font-weight:700;margin-bottom:14px;outline:none">
+    <button class="btn" style="width:100%;justify-content:center" type="submit">Увійти</button>
+  </form>
+</div>
+{% endblock %}

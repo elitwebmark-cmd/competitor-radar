@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Дашборд · Competitor Radar{% endblock %}
+{% block head %}
+<style>
+.top{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:6px 0 18px}
+.top h1{font-size:22px;margin:0}
+.top .sub{color:var(--mute);font-size:13px;font-weight:700}
+.top .sp{flex:1}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.sc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.sc .n{font-size:26px;font-weight:900;line-height:1.1}
+.sc .l{color:var(--mute);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
+.sc .d{font-size:12px;font-weight:800;margin-top:8px}
+.g{color:#8ab4ff}.m{color:#f78fb3}
+.progress{display:none;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:12px 16px;margin-bottom:16px;font-weight:700;font-size:13px}
+.progress.on{display:block}
+.pbar{height:7px;background:var(--card2);border-radius:99px;overflow:hidden;margin-top:9px}
+.pbar>i{display:block;height:100%;background:var(--red);width:0;transition:width .4s}
+table.ct{width:100%;border-collapse:collapse}
+table.ct th{text-align:left;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+  font-weight:800;padding:9px 12px;border-bottom:1px solid var(--line)}
+table.ct td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.ct tr:hover td{background:var(--card)}
+.dom{font-weight:800;font-size:15px}
+.dom a:hover{color:var(--gold)}
+.chn{display:flex;flex-direction:column;gap:5px}
+.chn .cnt{font-weight:900;font-size:16px}
+.chn .cnt small{color:var(--mute);font-weight:700;font-size:12px}
+.plats{max-width:260px}
+.emptybox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px;text-align:center}
+</style>
+{% endblock %}
+{% block body %}
+
+<div class="top">
+  <div>
+    <h1>Рекламна активність конкурентів</h1>
+    <div class="sub">
+      {% if cur %}зріз: {{ cur.date }} UTC · {{ data.total }} конкурентів{% if data.has_prev %} · порівняно з попереднім зрізом{% endif %}
+      {% else %}ще немає жодного зрізу{% endif %}
+    </div>
+  </div>
+  <div class="sp"></div>
+  <button class="btn" id="refreshBtn" onclick="startScan()">🔄 Оновити зараз</button>
+</div>
+
+<div class="progress" id="prog">
+  <span id="progTxt">Сканування…</span>
+  <div class="pbar"><i id="progBar"></i></div>
+</div>
+
+{% if not cur %}
+<div class="emptybox">
+  <div style="font-size:40px">📡</div>
+  <h2 style="margin:10px 0 6px">Ще немає даних</h2>
+  <p class="mut">Натисніть «Оновити зараз», щоб зробити перший зріз по {{ competitors|length }} конкурентах.
+     Це займе кілька хвилин (Google + Meta по кожному).</p>
+</div>
+{% else %}
+
+<div class="sum">
+  <div class="sc"><div class="n g">{{ data.active_google }}<span class="mut" style="font-size:16px">/{{ data.total }}</span></div>
+    <div class="l">крутять Google Ads</div>
+    {% if data.has_prev %}<div class="d">{% if data.started_google %}<span class="up">+{{ data.started_google|length }} почали</span>{% endif %}{% if data.started_google and data.stopped_google %} · {% endif %}{% if data.stopped_google %}<span class="down">−{{ data.stopped_google|length }} зупинили</span>{% endif %}{% if not data.started_google and not data.stopped_google %}<span class="mut">без змін</span>{% endif %}</div>{% endif %}
+  </div>
+  <div class="sc"><div class="n m">{{ data.active_meta }}<span class="mut" style="font-size:16px">/{{ data.total }}</span></div>
+    <div class="l">крутять Meta (FB/IG)</div>
+    {% if data.has_prev %}<div class="d">{% if data.started_meta %}<span class="up">+{{ data.started_meta|length }} почали</span>{% endif %}{% if data.started_meta and data.stopped_meta %} · {% endif %}{% if data.stopped_meta %}<span class="down">−{{ data.stopped_meta|length }} зупинили</span>{% endif %}{% if not data.started_meta and not data.stopped_meta %}<span class="mut">без змін</span>{% endif %}</div>{% endif %}
+  </div>
+  <div class="sc"><div class="n">{{ data.active_any }}<span class="mut" style="font-size:16px">/{{ data.total }}</span></div>
+    <div class="l">активні хоча б в одному</div>
+    <div class="d mut">{{ data.total - data.active_any }} зараз без реклами</div>
+  </div>
+</div>
+
+<table class="ct">
+  <thead><tr><th>Конкурент</th><th>Google Ads</th><th>Meta (FB/IG)</th><th class="plats">Платформи / формати</th></tr></thead>
+  <tbody>
+  {% for r in data.rows %}
+    {% set g = r.google %}{% set m = r.meta %}
+    <tr>
+      <td><div class="dom"><a href="{{ url_for('competitor', domain=r.domain) }}">{{ r.domain }}</a></div>
+        <div class="small mut">деталі →</div></td>
+
+      <td><div class="chn">
+        {% if r.g_running %}<span class="pill on">● крутить</span>{% else %}<span class="pill off">○ нема</span>{% endif %}
+        {% if r.g_status=='started' %}<span class="pill started">↑ почав</span>{% elif r.g_status=='stopped' %}<span class="pill stopped">↓ зупинив</span>{% endif %}
+        {% if r.g_running %}<div class="cnt">{{ r.g_count }} <small>оголош.{% if r.g_delta and r.g_delta>0 %} <span class="up">+{{ r.g_delta }}</span>{% elif r.g_delta and r.g_delta<0 %} <span class="down">{{ r.g_delta }}</span>{% endif %}</small></div>{% endif %}
+      </div></td>
+
+      <td><div class="chn">
+        {% if r.m_running %}<span class="pill on">● крутить</span>{% else %}<span class="pill off">○ нема</span>{% endif %}
+        {% if r.m_status=='started' %}<span class="pill started">↑ почав</span>{% elif r.m_status=='stopped' %}<span class="pill stopped">↓ зупинив</span>{% endif %}
+        {% if r.m_running %}<div class="cnt">{{ r.m_count }} <small>крео{% if r.m_delta and r.m_delta>0 %} <span class="up">+{{ r.m_delta }}</span>{% elif r.m_delta and r.m_delta<0 %} <span class="down">{{ r.m_delta }}</span>{% endif %}</small></div>{% endif %}
+      </div></td>
+
+      <td class="plats">
+        {% if r.g_running and g.platforms %}{% for k,v in g.platforms.items() %}{% if v %}<span class="badge">{{ g.platform_labels.get(k, k) }} {{ v }}</span>{% endif %}{% endfor %}{% endif %}
+        {% if r.g_running and g.formats %}{% set f=g.formats %}<span class="badge">пошук {{ f.get('text',0) }} · банер {{ f.get('image',0) }} · відео {{ f.get('video',0) }}</span>{% endif %}
+        {% if r.m_running and m.platforms %}{% for k,v in m.platforms.items() %}{% if v %}<span class="badge">{{ {'facebook':'FB','instagram':'IG','messenger':'Msg','audience_network':'AN'}.get(k,k) }} {{ v }}</span>{% endif %}{% endfor %}{% endif %}
+        {% if not r.g_running and not r.m_running %}<span class="mut small">—</span>{% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if snaps and snaps|length>1 %}
+<div class="small mut" style="margin-top:16px">Історія зрізів: {% for s in snaps %}{{ s.date }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+var scanning = {{ 'true' if status.running else 'false' }};
+var lastTs = {{ (snaps[0].ts if snaps else 0) }};
+function ui(st){
+  var p=document.getElementById('prog'), bar=document.getElementById('progBar'),
+      txt=document.getElementById('progTxt'), btn=document.getElementById('refreshBtn');
+  if(st.running){
+    p.classList.add('on'); btn.disabled=true;
+    var pct = st.total? Math.round(st.done/st.total*100):0;
+    bar.style.width=pct+'%';
+    txt.textContent='Сканування… '+st.done+'/'+st.total+(st.current?(' · '+st.current):'');
+  } else {
+    btn.disabled=false;
+    if(scanning){ // щойно завершилось
+      txt.textContent='Готово, оновлюю…'; bar.style.width='100%';
+      setTimeout(function(){ location.reload(); }, 900); return;
+    }
+    p.classList.remove('on');
+  }
+}
+function poll(){
+  fetch('/status').then(function(r){return r.json();}).then(function(st){
+    ui(st);
+    if(!st.running && scanning){ scanning=false; }
+    if(st.running){ scanning=true; }
+    if(st.running){ setTimeout(poll, 2500); }
+  }).catch(function(){ setTimeout(poll, 4000); });
+}
+function startScan(){
+  var btn=document.getElementById('refreshBtn'); btn.disabled=true;
+  fetch('/refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(){
+    scanning=true; poll();
+  });
+}
+if(scanning){ poll(); }
+</script>
+{% endblock %}

@@ -43,7 +43,7 @@ META_ADS_COUNTRY = os.getenv("META_ADS_COUNTRY", "ALL")
 
 # --- AI-аналітика (Claude, з читанням скріншотів Google-оголошень зором) ---
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-AI_MODEL = os.getenv("AI_MODEL", "claude-3-5-sonnet-latest")   # має підтримувати vision
+AI_MODEL = os.getenv("AI_MODEL", "claude-3-5-sonnet-20241022")  # vision; є автофолбек на інші
 AI_MAX_IMAGES = int(os.getenv("AI_MAX_IMAGES", "6"))           # скільки Google-скрінів дивитись
 AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "1500"))
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "90"))

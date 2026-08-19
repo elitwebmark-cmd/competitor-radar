@@ -40,18 +40,44 @@ def _download_image(url: str):
         return None
 
 
+# Кандидати моделей (усі з підтримкою vision). Перебираємо, поки одна не спрацює —
+# щоб не залежати від того, які саме назви доступні конкретному акаунту.
+_FALLBACK = [
+    "claude-sonnet-4-20250514",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-20240620",
+    "claude-3-haiku-20240307",
+]
+_WORKING_MODEL = None          # запамʼятовуємо першу робочу
+
+
+def _model_candidates():
+    order = []
+    for m in ([_WORKING_MODEL, config.AI_MODEL] + _FALLBACK):
+        if m and m not in order:
+            order.append(m)
+    return order
+
+
 def _call(system: str, content: list) -> str:
+    global _WORKING_MODEL
     headers = {"x-api-key": config.ANTHROPIC_API_KEY,
                "anthropic-version": "2023-06-01",
                "content-type": "application/json"}
-    body = {"model": config.AI_MODEL, "max_tokens": config.AI_MAX_TOKENS,
-            "system": system, "messages": [{"role": "user", "content": content}]}
-    r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
-    if r.status_code != 200:
+    last = ""
+    for model in _model_candidates():
+        body = {"model": model, "max_tokens": config.AI_MAX_TOKENS,
+                "system": system, "messages": [{"role": "user", "content": content}]}
+        r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
+        if r.status_code == 200:
+            _WORKING_MODEL = model
+            parts = r.json().get("content") or []
+            return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+        if r.status_code == 404 and "not_found" in r.text:
+            last = f"модель {model} недоступна"
+            continue                      # пробуємо наступну назву моделі
         raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
-    data = r.json()
-    parts = data.get("content") or []
-    return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+    raise RuntimeError("жодна з моделей Claude недоступна акаунту: " + last)
 
 
 def _parse_json(text: str) -> dict:

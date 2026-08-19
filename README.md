@@ -30,6 +30,8 @@
 | `SECRET_KEY` | так | будь-який довгий рядок (сесії) |
 | `SERPAPI_KEY` | так | ключ SerpApi (Google Ads Transparency) |
 | `APIFY_TOKEN` | так | токен Apify (Meta Ad Library) |
+| `ANTHROPIC_API_KEY` | для AI | ключ Anthropic — AI-розбор маркетингу (читає скріни Google зором) |
+| `AI_MODEL` | ні | модель Claude (дефолт `claude-3-5-sonnet-latest`, має підтримувати vision) |
 | `APP_LOGIN` | ні | логін (дефолт `elitweb`) |
 | `COMPETITORS` | ні | список доменів через кому (інакше — вбудований) |
 | `DATA_DIR` | ні | шлях до сховища зрізів (дефолт `./data`) |

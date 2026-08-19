@@ -10,6 +10,7 @@ from flask import (Flask, render_template, request, redirect, url_for,
 import config
 import store
 import scanner
+import ai
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -64,7 +65,8 @@ def dashboard():
     snaps = store.list_snapshots()
     return render_template("dashboard.html", data=data, cur=cur,
                            status=scanner.get_status(), snaps=snaps[:14],
-                           competitors=config.COMPETITORS)
+                           competitors=config.COMPETITORS, ai_on=ai.enabled(),
+                           market=(cur.get("ai_market") if cur else None))
 
 
 @app.route("/competitor/<path:domain>")
@@ -75,7 +77,40 @@ def competitor(domain):
     if not rec:
         abort(404)
     return render_template("competitor.html", domain=domain, rec=rec,
-                           snap_date=(cur.get("date") if cur else ""))
+                           snap_date=(cur.get("date") if cur else ""),
+                           ai_on=ai.enabled())
+
+
+@app.route("/competitor/<path:domain>/ai", methods=["POST"])
+@login_required
+def competitor_ai(domain):
+    """AI-розбір маркетингу одного конкурента (кешується у знімок)."""
+    cur = store.latest()
+    doms = (cur or {}).get("domains") or {}
+    rec = doms.get(domain)
+    if not rec:
+        return jsonify({"ok": False, "error": "конкурента немає в останньому зрізі"}), 404
+    res = ai.analyze_competitor(domain, rec)
+    rec["ai"] = res
+    rec["ai_ts"] = int(time.time())
+    store.save_snapshot(cur)                      # перезапис того ж файлу (той самий ts)
+    return jsonify({"ok": not res.get("error"), "ai": res})
+
+
+@app.route("/ai-market", methods=["POST"])
+@login_required
+def ai_market():
+    """Ринковий огляд по вже проаналізованих конкурентах (кешується у знімок)."""
+    cur = store.latest()
+    doms = (cur or {}).get("domains") or {}
+    if not doms:
+        return jsonify({"ok": False, "error": "немає зрізу"}), 400
+    items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
+    res = ai.analyze_market(items)
+    cur["ai_market"] = res
+    cur["ai_market_ts"] = int(time.time())
+    store.save_snapshot(cur)
+    return jsonify({"ok": not res.get("error"), "market": res})
 
 
 # ----------------------------- сканування ---------------------------------

@@ -1,0 +1,180 @@
+"""AI-аналітика маркетингу конкурентів (Claude).
+Читає скріншоти Google-оголошень ЗОРОМ (без окремого OCR) + Meta-тексти і
+формує структурований розбір: послуги, напрямки, оффери, УТП, меседжі, канали.
+Плюс ринковий огляд по всіх конкурентах."""
+from __future__ import annotations
+import json
+import base64
+import logging
+
+import requests
+import config
+
+log = logging.getLogger("radar.ai")
+
+_API = "https://api.anthropic.com/v1/messages"
+_ALLOWED_IMG = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+def enabled() -> bool:
+    return bool(config.ANTHROPIC_API_KEY)
+
+
+# --------------------------- низькорівневе ---------------------------------
+def _download_image(url: str):
+    """Повертає (media_type, base64) або None."""
+    if not url or not url.startswith("http"):
+        return None
+    try:
+        r = requests.get(url, timeout=config.HTTP_TIMEOUT,
+                         headers={"User-Agent": config.USER_AGENT})
+        if r.status_code != 200:
+            return None
+        ct = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if ct not in _ALLOWED_IMG:
+            return None
+        if len(r.content) > 3_500_000:            # ~3.5MB кеп
+            return None
+        return ct, base64.standard_b64encode(r.content).decode("ascii")
+    except Exception:
+        return None
+
+
+def _call(system: str, content: list) -> str:
+    headers = {"x-api-key": config.ANTHROPIC_API_KEY,
+               "anthropic-version": "2023-06-01",
+               "content-type": "application/json"}
+    body = {"model": config.AI_MODEL, "max_tokens": config.AI_MAX_TOKENS,
+            "system": system, "messages": [{"role": "user", "content": content}]}
+    r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
+    if r.status_code != 200:
+        raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    parts = data.get("content") or []
+    return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+
+
+def _parse_json(text: str) -> dict:
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.split("```", 2)[1]
+        if t.lstrip().lower().startswith("json"):
+            t = t.split("\n", 1)[1] if "\n" in t else t
+    a, b = t.find("{"), t.rfind("}")
+    if a >= 0 and b > a:
+        t = t[a:b + 1]
+    try:
+        return json.loads(t)
+    except Exception:
+        return {}
+
+
+# --------------------------- аналіз одного ---------------------------------
+_SYS_ONE = (
+    "Ти — маркетинговий аналітик діджитал-агенції. Аналізуєш рекламу конкурента "
+    "(скріншоти оголошень Google та тексти оголошень Meta). Спочатку прочитай "
+    "текст зі скріншотів, потім зроби висновки. Відповідай ВИКЛЮЧНО валідним JSON "
+    "українською, без пояснень поза JSON.")
+
+_SCHEMA_ONE = (
+    'Поверни JSON рівно з такими ключами:\n'
+    '{\n'
+    '  "services": ["перелік послуг, які рекламує (SEO, SMM, таргет, контекст, розробка, ...)"],\n'
+    '  "directions": ["напрямки/ніші/сегменти, на які орієнтується"],\n'
+    '  "offers": ["конкретні оффери, акції, ліди-магніти, ціни, які згадуються"],\n'
+    '  "utp": "1-2 речення: у чому їхнє позиціонування / УТП",\n'
+    '  "messaging": ["ключові меседжі / болі / вигоди, на які тиснуть"],\n'
+    '  "landing_focus": ["які послуги/сторінки просувають найактивніше"],\n'
+    '  "channels": "де активні і на що акцент (Google vs Meta)",\n'
+    '  "summary": "2-3 речення підсумку про маркетинг конкурента"\n'
+    '}')
+
+
+def analyze_competitor(domain: str, rec: dict) -> dict:
+    if not enabled():
+        return {"error": "ANTHROPIC_API_KEY не заданий"}
+    g = (rec or {}).get("google") or {}
+    m = (rec or {}).get("meta") or {}
+
+    ctx = [f"Конкурент: {domain}"]
+    ctx.append(f"Google Ads: {'крутить' if g.get('running') else 'не крутить'}, "
+               f"~{g.get('count', 0)} оголошень, платформи: {g.get('platforms') or {}}.")
+    gtexts = [c.get("text") for c in (g.get("creatives") or []) if c.get("text")][:12]
+    if gtexts:
+        ctx.append("Тексти/заголовки Google-оголошень: " + " | ".join(gtexts))
+    ctx.append(f"Meta (FB/IG): {'крутить' if m.get('running') else 'не крутить'}, "
+               f"~{m.get('count', 0)} крео, сторінка: {m.get('page') or '—'}.")
+    mtexts = [c.get("text") for c in (m.get("creatives") or []) if c.get("text")][:12]
+    if mtexts:
+        ctx.append("Тексти Meta-оголошень: " + " | ".join(mtexts))
+
+    content = [{"type": "text", "text": "\n".join(ctx)}]
+
+    # скріншоти Google-оголошень — читаємо зором
+    imgs = 0
+    for c in (g.get("creatives") or []):
+        if imgs >= config.AI_MAX_IMAGES:
+            break
+        got = _download_image(c.get("image"))
+        if not got:
+            continue
+        mt, b64 = got
+        content.append({"type": "image",
+                        "source": {"type": "base64", "media_type": mt, "data": b64}})
+        imgs += 1
+    if imgs:
+        content.append({"type": "text",
+                        "text": f"Вище — {imgs} скріншот(и) Google-оголошень цього конкурента. "
+                                "Прочитай з них текст і врахуй у розборі."})
+
+    content.append({"type": "text", "text": _SCHEMA_ONE})
+    try:
+        out = _parse_json(_call(_SYS_ONE, content))
+    except Exception as e:
+        log.exception("analyze_competitor %s", domain)
+        return {"error": str(e)[:200]}
+    if not out:
+        return {"error": "не вдалося розібрати відповідь AI"}
+    out["_images_read"] = imgs
+    return out
+
+
+# --------------------------- ринковий огляд --------------------------------
+_SYS_MKT = (
+    "Ти — стратег діджитал-агенції elit-web. На основі коротких розборів реклами "
+    "конкурентів зроби ринковий огляд. Відповідай ВИКЛЮЧНО валідним JSON українською.")
+
+_SCHEMA_MKT = (
+    'Поверни JSON рівно з ключами:\n'
+    '{\n'
+    '  "leaders": ["хто найагресивніше рекламується і в чому"],\n'
+    '  "common_offers": ["оффери/меседжі, які повторюються в багатьох"],\n'
+    '  "channels": "загальна картина: хто де (Google/Meta) і які акценти",\n'
+    '  "gaps": ["ніші/меседжі/оффери, які майже ніхто не займає — можливості для нас"],\n'
+    '  "recommendations": ["2-4 практичні поради elit-web по позиціонуванню/офферах"],\n'
+    '  "summary": "3-4 речення загального висновку по ринку"\n'
+    '}')
+
+
+def analyze_market(items: list) -> dict:
+    """items: [{"domain":..., "ai":{...аналіз...}}] — уже проаналізовані конкуренти."""
+    if not enabled():
+        return {"error": "ANTHROPIC_API_KEY не заданий"}
+    lines = []
+    for it in items:
+        a = it.get("ai") or {}
+        if not a or a.get("error"):
+            continue
+        lines.append(
+            f"- {it['domain']}: послуги={a.get('services')}; напрямки={a.get('directions')}; "
+            f"оффери={a.get('offers')}; УТП={a.get('utp')}; канали={a.get('channels')}")
+    if not lines:
+        return {"error": "немає проаналізованих конкурентів (спершу зроби AI-аналіз кількох)"}
+    content = [{"type": "text",
+                "text": "Розбори реклами конкурентів:\n" + "\n".join(lines) + "\n\n" + _SCHEMA_MKT}]
+    try:
+        out = _parse_json(_call(_SYS_MKT, content))
+    except Exception as e:
+        log.exception("analyze_market")
+        return {"error": str(e)[:200]}
+    return out or {"error": "не вдалося розібрати відповідь AI"}

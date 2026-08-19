@@ -27,11 +27,49 @@ h1.dh{font-size:24px;margin:0 0 4px}
 .cr a.open{font-size:11px;font-weight:800;color:var(--blue)}
 .off{color:var(--mute);font-weight:700;padding:10px 0}
 .linkbtn{display:inline-block;font-size:12px;font-weight:800;color:var(--blue);margin-left:auto}
+.chan.ai{border-color:#33314a;background:linear-gradient(180deg,#181624,#161619)}
+.chan.ai h2{align-items:center}
+.aigrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:6px 0}
+.aic{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.aic.wide{margin-top:10px}
+.ail{color:var(--mute);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px}
+.aitx{font-size:14px;font-weight:600;color:var(--mute2);line-height:1.5}
+.aiul{margin:0;padding-left:18px}
+.aiul li{font-size:13.5px;color:var(--mute2);font-weight:600;margin-bottom:4px;line-height:1.45}
+.ai-spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 {% endblock %}
 {% block body %}
 <div class="crumb"><a href="{{ url_for('dashboard') }}">← Дашборд</a> · зріз {{ snap_date }} UTC</div>
 <h1 class="dh">{{ domain }}</h1>
+
+{% set a = rec.ai %}
+<div class="chan ai" id="aibox">
+  <h2>🧠 AI-розбір маркетингу
+    {% if a and not a.error %}<span class="mut small" style="font-weight:700">· прочитано скрінів: {{ a._images_read or 0 }}</span>{% endif %}
+    {% if ai_on %}<button class="btn ghost" id="aiBtn" style="margin-left:auto;font-size:12px;padding:6px 12px" onclick="runAI()">{% if a and not a.error %}↻ Оновити{% else %}Запустити аналіз{% endif %}</button>{% endif %}
+  </h2>
+  {% if not ai_on %}
+    <div class="off">AI вимкнено: не заданий <code>ANTHROPIC_API_KEY</code>.</div>
+  {% elif a and a.error %}
+    <div class="off" style="color:var(--red)">Помилка аналізу: {{ a.error }}. Спробуйте ще раз.</div>
+  {% elif a %}
+    {% if a.summary %}<p style="margin:2px 0 14px;font-size:15px;font-weight:600">{{ a.summary }}</p>{% endif %}
+    <div class="aigrid">
+      {% if a.services %}<div class="aic"><div class="ail">Послуги</div><div>{% for s in a.services %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
+      {% if a.directions %}<div class="aic"><div class="ail">Напрямки / ніші</div><div>{% for s in a.directions %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
+      {% if a.landing_focus %}<div class="aic"><div class="ail">Що просувають найактивніше</div><div>{% for s in a.landing_focus %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
+    </div>
+    {% if a.utp %}<div class="aic wide"><div class="ail">УТП / позиціонування</div><div class="aitx">{{ a.utp }}</div></div>{% endif %}
+    {% if a.offers %}<div class="aic wide"><div class="ail">Оффери / акції</div><ul class="aiul">{% for s in a.offers %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.messaging %}<div class="aic wide"><div class="ail">Меседжі / болі</div><ul class="aiul">{% for s in a.messaging %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.channels %}<div class="aic wide"><div class="ail">Канали</div><div class="aitx">{{ a.channels }}</div></div>{% endif %}
+  {% else %}
+    <div class="off">Натисніть «Запустити аналіз» — Claude прочитає скріншоти Google-оголошень і тексти Meta й опише послуги, напрямки, оффери та УТП конкурента.</div>
+  {% endif %}
+</div>
 
 {% macro gallery(items, kind) %}
   {% if items %}
@@ -87,4 +125,21 @@ h1.dh{font-size:24px;margin:0 0 4px}
   {% else %}<div class="off">{{ m.note or 'Зараз не крутить рекламу в Meta.' }}</div>{% endif %}
 </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+function runAI(){
+  var btn=document.getElementById('aiBtn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="ai-spin"></span>Аналізую… (до 1 хв)'; }
+  fetch('{{ url_for("competitor_ai", domain=domain) }}',{method:'POST'})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(res && res.ok){ location.reload(); }
+      else { if(btn){ btn.disabled=false; btn.textContent='Спробувати ще раз'; }
+             alert('AI: '+((res&&res.ai&&res.ai.error)||(res&&res.error)||'помилка')); }
+    })
+    .catch(function(){ if(btn){ btn.disabled=false; btn.textContent='Спробувати ще раз'; }
+                       alert('Помилка мережі'); });
+}
+</script>
 {% endblock %}

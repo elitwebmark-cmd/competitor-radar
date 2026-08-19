@@ -29,6 +29,24 @@ table.ct tr:hover td{background:var(--card)}
 .chn .cnt small{color:var(--mute);font-weight:700;font-size:12px}
 .plats{max-width:260px}
 .emptybox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:36px;text-align:center}
+.mkt,.scale{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:16px}
+.mkt.ai,.mkt{background:linear-gradient(180deg,#181624,#161619);border-color:#33314a}
+.mkt-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mkt-h h2{font-size:16px;margin:0}
+.mkt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.mkt-c{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.mkt-c ul{margin:0;padding-left:16px}
+.mkt-c li{font-size:13px;color:var(--mute2);font-weight:600;margin-bottom:4px;line-height:1.4}
+.ail{color:var(--mute);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px}
+.scr{display:grid;grid-template-columns:160px 1fr 150px;align-items:center;gap:12px;padding:5px 0}
+.scn{font-weight:800;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scn a:hover{color:var(--gold)}
+.scbar{height:14px;background:var(--card2);border-radius:7px;overflow:hidden;display:flex}
+.scbar i{height:100%;display:block}
+.scbar i.g{background:#4c9ffe}.scbar i.m{background:#f78fb3}
+.scv{text-align:right;font-size:13px}.scv b{font-size:15px}
+i.lg{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:3px}
+i.lg.g{background:#4c9ffe}i.lg.m{background:#f78fb3}
 </style>
 {% endblock %}
 {% block body %}
@@ -72,6 +90,38 @@ table.ct tr:hover td{background:var(--card)}
     <div class="l">активні хоча б в одному</div>
     <div class="d mut">{{ data.total - data.active_any }} зараз без реклами</div>
   </div>
+</div>
+
+<div class="mkt">
+  <div class="mkt-h"><h2>🧭 Ринковий AI-огляд</h2>
+    {% if ai_on %}<button class="btn ghost" id="mktBtn" onclick="runMarket()" style="margin-left:auto;font-size:12px;padding:6px 12px">{% if market and not market.error %}↻ Оновити{% else %}Згенерувати{% endif %}</button>{% endif %}</div>
+  {% if not ai_on %}<div class="mut small">AI вимкнено (немає <code>ANTHROPIC_API_KEY</code>).</div>
+  {% elif market and market.error %}<div class="small" style="color:var(--red)">{{ market.error }}</div>
+  {% elif market %}
+    {% if market.summary %}<p style="margin:2px 0 12px;font-weight:600">{{ market.summary }}</p>{% endif %}
+    <div class="mkt-grid">
+      {% if market.leaders %}<div class="mkt-c"><div class="ail">Лідери</div><ul>{% for x in market.leaders %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if market.common_offers %}<div class="mkt-c"><div class="ail">Спільні оффери / меседжі</div><ul>{% for x in market.common_offers %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if market.gaps %}<div class="mkt-c"><div class="ail">Вільні ніші (можливості)</div><ul>{% for x in market.gaps %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if market.recommendations %}<div class="mkt-c"><div class="ail">Рекомендації elit-web</div><ul>{% for x in market.recommendations %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+    </div>
+  {% else %}<div class="mut small">Спочатку зроби AI-аналіз кількох конкурентів (на їх сторінках), потім згенеруй ринковий огляд.</div>{% endif %}
+</div>
+
+{% set ns = namespace(mx=1) %}
+{% for r in data.rows %}{% set t = r.g_count + r.m_count %}{% if t > ns.mx %}{% set ns.mx = t %}{% endif %}{% endfor %}
+<div class="scale">
+  <div class="mkt-h"><h2>📊 Масштаби реклами (порівняння)</h2><span class="mut small" style="margin-left:auto">Google + Meta, к-сть оголошень</span></div>
+  {% for r in data.rows %}{% set tot = r.g_count + r.m_count %}
+  <div class="scr">
+    <div class="scn"><a href="{{ url_for('competitor', domain=r.domain) }}">{{ r.domain }}</a></div>
+    <div class="scbar">
+      <i class="g" style="width:{{ (r.g_count / ns.mx * 100)|round(1) }}%"></i><i class="m" style="width:{{ (r.m_count / ns.mx * 100)|round(1) }}%"></i>
+    </div>
+    <div class="scv">{% if tot %}<b>{{ tot }}</b> <span class="mut small">G {{ r.g_count }} · M {{ r.m_count }}</span>{% else %}<span class="mut small">—</span>{% endif %}</div>
+  </div>
+  {% endfor %}
+  <div class="mut small" style="margin-top:8px"><i class="lg g"></i> Google &nbsp; <i class="lg m"></i> Meta</div>
 </div>
 
 <table class="ct">
@@ -148,5 +198,14 @@ function startScan(){
   });
 }
 if(scanning){ poll(); }
+function runMarket(){
+  var b=document.getElementById('mktBtn');
+  if(b){ b.disabled=true; b.innerHTML='Генерую…'; }
+  fetch('/ai-market',{method:'POST'}).then(function(r){return r.json();}).then(function(res){
+    if(res && res.ok){ location.reload(); }
+    else { if(b){ b.disabled=false; b.textContent='Спробувати ще раз'; }
+           alert('AI: '+((res&&res.market&&res.market.error)||(res&&res.error)||'помилка')); }
+  }).catch(function(){ if(b){ b.disabled=false; b.textContent='Спробувати ще раз'; } });
+}
 </script>
 {% endblock %}

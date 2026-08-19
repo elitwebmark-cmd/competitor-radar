@@ -131,6 +131,13 @@ def status():
     return jsonify(st)
 
 
+@app.route("/ai-models")
+@login_required
+def ai_models():
+    return jsonify({"enabled": ai.enabled(), "available": ai.list_models(),
+                    "default": config.AI_MODEL})
+
+
 @app.route("/healthz")
 def healthz():
     return jsonify({"ok": True})

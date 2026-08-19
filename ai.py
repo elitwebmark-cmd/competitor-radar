@@ -49,11 +49,32 @@ _FALLBACK = [
     "claude-3-haiku-20240307",
 ]
 _WORKING_MODEL = None          # запамʼятовуємо першу робочу
+_API_MODELS = None             # кеш списку доступних акаунту моделей (/v1/models)
+
+
+def list_models() -> list:
+    """Реальний перелік моделей, доступних акаунту (Anthropic /v1/models)."""
+    global _API_MODELS
+    if _API_MODELS is not None:
+        return _API_MODELS
+    _API_MODELS = []
+    try:
+        r = requests.get("https://api.anthropic.com/v1/models",
+                         headers={"x-api-key": config.ANTHROPIC_API_KEY,
+                                  "anthropic-version": "2023-06-01"}, timeout=20)
+        if r.status_code == 200:
+            ids = [m.get("id") for m in (r.json().get("data") or []) if m.get("id")]
+            # пріоритет: sonnet → opus → haiku (усі сучасні підтримують vision)
+            ids.sort(key=lambda x: (0 if "sonnet" in x else 1 if "opus" in x else 2), reverse=False)
+            _API_MODELS = ids
+    except Exception:
+        pass
+    return _API_MODELS
 
 
 def _model_candidates():
     order = []
-    for m in ([_WORKING_MODEL, config.AI_MODEL] + _FALLBACK):
+    for m in ([_WORKING_MODEL, config.AI_MODEL] + list_models() + _FALLBACK):
         if m and m not in order:
             order.append(m)
     return order
@@ -74,10 +95,11 @@ def _call(system: str, content: list) -> str:
             parts = r.json().get("content") or []
             return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
         if r.status_code == 404 and "not_found" in r.text:
-            last = f"модель {model} недоступна"
+            last = f"{model}"
             continue                      # пробуємо наступну назву моделі
         raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
-    raise RuntimeError("жодна з моделей Claude недоступна акаунту: " + last)
+    avail = ", ".join(list_models()) or "(список порожній / недоступний)"
+    raise RuntimeError(f"жодна модель не підійшла. Доступні акаунту: {avail}")
 
 
 def _parse_json(text: str) -> dict:

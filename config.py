@@ -22,6 +22,9 @@ DATA_DIR = os.getenv("DATA_DIR", os.path.join(os.path.dirname(__file__), "data")
 
 # --- Сканування ---
 SCAN_WORKERS = int(os.getenv("SCAN_WORKERS", "4"))       # паралельні домени (Apify повільний)
+# Добовий авто-скан ВИМКНЕНО за замовчуванням — лише ручний «Оновити зараз».
+# Увімкнути: SCAN_AUTO=1
+SCAN_AUTO_ENABLED = os.getenv("SCAN_AUTO", "0") not in ("0", "false", "False", "")
 SCAN_HOUR_UTC = int(os.getenv("SCAN_HOUR_UTC", "5"))     # година доб. авто-скану (UTC); 5 ≈ 07-08 Київ
 SCAN_MIN_INTERVAL_H = int(os.getenv("SCAN_MIN_INTERVAL_H", "6"))  # не частіше, ніж раз на N год
 

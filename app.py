@@ -174,6 +174,9 @@ def _start_scheduler():
     global _SCHED_STARTED
     if _SCHED_STARTED:
         return
+    if not config.SCAN_AUTO_ENABLED:
+        log.info("scheduler: добовий авто-скан вимкнено (лише ручний). Увімкнути: SCAN_AUTO=1")
+        return
     with _SCHED_LOCK:
         if _SCHED_STARTED:
             return

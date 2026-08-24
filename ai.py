@@ -86,23 +86,27 @@ def _call(system: str, content: list, prefill: str = "") -> str:
     headers = {"x-api-key": config.ANTHROPIC_API_KEY,
                "anthropic-version": "2023-06-01",
                "content-type": "application/json"}
-    msgs = [{"role": "user", "content": content}]
-    if prefill:
-        msgs.append({"role": "assistant", "content": prefill})
     last = ""
     for model in _model_candidates():
-        body = {"model": model, "max_tokens": config.AI_MAX_TOKENS,
-                "system": system, "messages": msgs}
-        r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
-        if r.status_code == 200:
-            _WORKING_MODEL = model
-            parts = r.json().get("content") or []
-            txt = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
-            return (prefill + txt) if prefill else txt
-        if r.status_code == 404 and "not_found" in r.text:
-            last = f"{model}"
-            continue                      # пробуємо наступну назву моделі
-        raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
+        # для кожної моделі: спершу з prefill, і якщо вона його не підтримує (400) — без нього
+        for pf in ([prefill, ""] if prefill else [""]):
+            msgs = [{"role": "user", "content": content}]
+            if pf:
+                msgs.append({"role": "assistant", "content": pf})
+            body = {"model": model, "max_tokens": config.AI_MAX_TOKENS,
+                    "system": system, "messages": msgs}
+            r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
+            if r.status_code == 200:
+                _WORKING_MODEL = model
+                parts = r.json().get("content") or []
+                txt = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+                return (pf + txt) if pf else txt
+            if r.status_code == 404 and "not_found" in r.text:
+                last = f"{model}"
+                break                     # ця назва недоступна → наступна модель
+            if r.status_code == 400 and "prefill" in r.text.lower() and pf:
+                continue                  # модель не підтримує prefill → повтор без нього
+            raise RuntimeError(f"Anthropic {r.status_code}: {r.text[:200]}")
     avail = ", ".join(list_models()) or "(список порожній / недоступний)"
     raise RuntimeError(f"жодна модель не підійшла. Доступні акаунту: {avail}")
 

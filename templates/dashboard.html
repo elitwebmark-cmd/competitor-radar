@@ -60,7 +60,8 @@ i.lg.g{background:#4c9ffe}i.lg.m{background:#f78fb3}
     </div>
   </div>
   <div class="sp"></div>
-  <button class="btn" id="refreshBtn" onclick="startScan()">🔄 Оновити зараз</button>
+  <button class="btn ghost" id="refreshBtn" onclick="startScan()">🔄 Оновити рекламу</button>
+  <button class="btn" id="fullBtn" onclick="startFull()">🧠 Повне оновлення (реклама + AI)</button>
 </div>
 
 <div class="progress" id="prog">
@@ -166,16 +167,23 @@ i.lg.g{background:#4c9ffe}i.lg.m{background:#f78fb3}
 <script>
 var scanning = {{ 'true' if status.running else 'false' }};
 var lastTs = {{ (snaps[0].ts if snaps else 0) }};
+var PHASE = {scan:'Реклама', ai:'AI-аналіз', market:'Ринковий огляд'};
 function ui(st){
   var p=document.getElementById('prog'), bar=document.getElementById('progBar'),
-      txt=document.getElementById('progTxt'), btn=document.getElementById('refreshBtn');
+      txt=document.getElementById('progTxt'),
+      b1=document.getElementById('refreshBtn'), b2=document.getElementById('fullBtn');
   if(st.running){
-    p.classList.add('on'); btn.disabled=true;
-    var pct = st.total? Math.round(st.done/st.total*100):0;
-    bar.style.width=pct+'%';
-    txt.textContent='Сканування… '+st.done+'/'+st.total+(st.current?(' · '+st.current):'');
+    p.classList.add('on'); if(b1) b1.disabled=true; if(b2) b2.disabled=true;
+    var lbl = PHASE[st.phase] || 'Оновлення';
+    if(st.phase==='market'){
+      bar.style.width='97%'; txt.textContent='Ринковий огляд…';
+    } else {
+      var pct = st.total? Math.round(st.done/st.total*100):0;
+      bar.style.width=pct+'%';
+      txt.textContent=lbl+' '+st.done+'/'+st.total+(st.current?(' · '+st.current):'');
+    }
   } else {
-    btn.disabled=false;
+    if(b1) b1.disabled=false; if(b2) b2.disabled=false;
     if(scanning){ // щойно завершилось
       txt.textContent='Готово, оновлюю…'; bar.style.width='100%';
       setTimeout(function(){ location.reload(); }, 900); return;
@@ -196,6 +204,13 @@ function startScan(){
   fetch('/refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(){
     scanning=true; poll();
   });
+}
+function startFull(){
+  if(!confirm('Повне оновлення: скан реклами + AI-розбір усіх конкурентів + ринковий огляд.\nЗайме приблизно 15–30 хв і витратить API (SerpApi/Apify/Anthropic). Продовжити?')) return;
+  var b=document.getElementById('fullBtn'); if(b){ b.disabled=true; }
+  fetch('/full-refresh',{method:'POST'}).then(function(r){return r.json();}).then(function(){
+    scanning=true; poll();
+  }).catch(function(){ if(b){ b.disabled=false; } });
 }
 if(scanning){ poll(); }
 function runMarket(){

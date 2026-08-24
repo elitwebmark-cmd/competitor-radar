@@ -121,6 +121,14 @@ def refresh():
     return jsonify({"ok": True, "started": started, "status": scanner.get_status()})
 
 
+@app.route("/full-refresh", methods=["POST"])
+@login_required
+def full_refresh():
+    """Повне оновлення: реклама + AI-розбір усіх + ринковий огляд (у фоні)."""
+    started = scanner.full_refresh_async()
+    return jsonify({"ok": True, "started": started, "status": scanner.get_status()})
+
+
 @app.route("/status")
 @login_required
 def status():

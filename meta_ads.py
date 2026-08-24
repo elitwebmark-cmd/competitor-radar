@@ -153,40 +153,32 @@ def _fetch_ads(url: str, max_items: int = None):
 def check(domain: str, debug: bool = False) -> dict:
     if not config.APIFY_TOKEN:
         return {"checked": False, "note": "APIFY_TOKEN не заданий"}
-    # Пріоритет — точний пошук за FB-сторінкою бренду (як view_all_page_id у веб-бібліотеці).
-    # Якщо сторінку на сайті не знайдено — відкат на keyword-пошук за брендом.
+    # ЛИШЕ точний пошук за FB-сторінкою бренду. Keyword-пошук прибрано —
+    # на практиці він ненадійний (підтягує чужі оголошення).
     fb = find_facebook_page(domain)
-    page = None
-    max_items = config.META_ADS_LIMIT   # точний пошук за сторінкою
-    if fb and fb[0] == "id":
-        page = fb[1]
+    if not fb:
+        brand0 = _host(domain).split(".")[0]
+        lib_url = _library_url(brand0)
+        if debug:
+            return {"checked": True, "count": 0, "no_page": True,
+                    "target_url": None, "by_keyword": False, "raw_sample": None}
+        return {"checked": True, "running": False, "count": 0, "page": brand0,
+                "platforms": {}, "creatives": [], "by_keyword": False,
+                "note": "FB-сторінку бренду не знайдено на сайті — Meta не перевіряли",
+                "link": lib_url}
+    page = fb[1]
+    if fb[0] == "id":
         target_url = (f"https://www.facebook.com/ads/library/?active_status=active&ad_type=all"
                       f"&country=ALL&search_type=page&view_all_page_id={fb[1]}")
         lib_url = target_url
-    elif fb and fb[0] == "slug":
-        page = fb[1]
+    else:                                   # slug
         target_url = f"https://www.facebook.com/{fb[1]}"
         lib_url = _library_url(fb[1])
-    else:
-        query = _host(domain).split(".")[0]
-        target_url = _library_url(query)
-        lib_url = target_url
-        max_items = config.META_KEYWORD_LIMIT   # keyword-пошук: менший кеп (чужі крео, дорого)
     try:
-        ads_list, page_name0 = _fetch_ads(target_url, max_items)
+        ads_list, page_name0 = _fetch_ads(target_url, config.META_ADS_LIMIT)
     except Exception as e:
         return {"checked": False, "note": f"помилка Apify: {str(e)[:140]}", "link": lib_url}
-
-    # Якщо за сторінкою нема активних — відкат на keyword-пошук (як у веб-Центрі).
-    by_keyword = (page is None)
-    if not ads_list and page:
-        kw_url = _library_url(_host(domain).split(".")[0])
-        try:
-            kl, pn = _fetch_ads(kw_url, config.META_KEYWORD_LIMIT)
-        except Exception:
-            kl, pn = [], None
-        if kl:
-            ads_list, page_name0, lib_url, by_keyword = kl, (page_name0 or pn), kw_url, True
+    by_keyword = False
 
     if debug:
         return {"checked": True, "count": len(ads_list), "target_url": target_url,

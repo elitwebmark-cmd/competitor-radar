@@ -80,20 +80,25 @@ def _model_candidates():
     return order
 
 
-def _call(system: str, content: list) -> str:
+def _call(system: str, content: list, prefill: str = "") -> str:
+    """prefill — префікс відповіді асистента (напр. '{'), щоб змусити чистий JSON."""
     global _WORKING_MODEL
     headers = {"x-api-key": config.ANTHROPIC_API_KEY,
                "anthropic-version": "2023-06-01",
                "content-type": "application/json"}
+    msgs = [{"role": "user", "content": content}]
+    if prefill:
+        msgs.append({"role": "assistant", "content": prefill})
     last = ""
     for model in _model_candidates():
         body = {"model": model, "max_tokens": config.AI_MAX_TOKENS,
-                "system": system, "messages": [{"role": "user", "content": content}]}
+                "system": system, "messages": msgs}
         r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
         if r.status_code == 200:
             _WORKING_MODEL = model
             parts = r.json().get("content") or []
-            return "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+            txt = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
+            return (prefill + txt) if prefill else txt
         if r.status_code == 404 and "not_found" in r.text:
             last = f"{model}"
             continue                      # пробуємо наступну назву моделі
@@ -177,12 +182,13 @@ def analyze_competitor(domain: str, rec: dict) -> dict:
 
     content.append({"type": "text", "text": _SCHEMA_ONE})
     try:
-        out = _parse_json(_call(_SYS_ONE, content))
+        raw = _call(_SYS_ONE, content, prefill="{")
     except Exception as e:
         log.exception("analyze_competitor %s", domain)
         return {"error": str(e)[:200]}
+    out = _parse_json(raw)
     if not out:
-        return {"error": "не вдалося розібрати відповідь AI"}
+        return {"error": "не вдалося розібрати відповідь AI: " + ((raw or "порожньо")[:200])}
     out["_images_read"] = imgs
     return out
 
@@ -221,8 +227,9 @@ def analyze_market(items: list) -> dict:
     content = [{"type": "text",
                 "text": "Розбори реклами конкурентів:\n" + "\n".join(lines) + "\n\n" + _SCHEMA_MKT}]
     try:
-        out = _parse_json(_call(_SYS_MKT, content))
+        raw = _call(_SYS_MKT, content, prefill="{")
     except Exception as e:
         log.exception("analyze_market")
         return {"error": str(e)[:200]}
-    return out or {"error": "не вдалося розібрати відповідь AI"}
+    out = _parse_json(raw)
+    return out or {"error": "не вдалося розібрати відповідь AI: " + ((raw or "порожньо")[:200])}

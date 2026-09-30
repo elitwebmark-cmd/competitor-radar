@@ -5,6 +5,7 @@
 from __future__ import annotations
 import json
 import re
+import time
 import base64
 import logging
 
@@ -97,12 +98,28 @@ def _call(system: str, content: list, prefill: str = "", max_tokens: int = None)
                 msgs.append({"role": "assistant", "content": pf})
             body = {"model": model, "max_tokens": mt,
                     "system": system, "messages": msgs}
-            r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
+            # ретрай на тимчасові збої (перевантаження/ліміт/5xx)
+            r = None
+            for attempt in range(3):
+                try:
+                    r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
+                except requests.RequestException:
+                    if attempt < 2:
+                        time.sleep(2 * (attempt + 1))
+                        continue
+                    raise
+                if r.status_code in (429, 500, 502, 503, 529) and attempt < 2:
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                break
             if r.status_code == 200:
                 _WORKING_MODEL = model
                 parts = r.json().get("content") or []
                 txt = "".join(p.get("text", "") for p in parts if p.get("type") == "text").strip()
-                return (pf + txt) if pf else txt
+                if txt:
+                    return (pf + txt) if pf else txt
+                last = f"{model}: порожня відповідь"
+                break                     # порожньо — спробувати наступну модель
             if r.status_code == 404 and "not_found" in r.text:
                 last = f"{model}"
                 break                     # ця назва недоступна → наступна модель

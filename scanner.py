@@ -160,11 +160,16 @@ def full_refresh(domains=None) -> dict:
                 except Exception:
                     snap["our_kpis"] = None
                 items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
-                snap["report"] = ai.market_report(items, agg, our_domain=config.OUR_DOMAIN,
-                                                  our_kpis=snap.get("our_kpis"))
-                snap["ai_market"] = snap["report"]          # сумісність зі старим віджетом
-                snap["report_ts"] = int(time.time())
-                snap["ai_market_ts"] = snap["report_ts"]
+                rep = ai.market_report(items, agg, our_domain=config.OUR_DOMAIN,
+                                       our_kpis=snap.get("our_kpis"))
+                if rep and not rep.get("error"):
+                    snap["report"] = rep
+                    snap["ai_market"] = rep                 # сумісність зі старим віджетом
+                    snap["report_ts"] = int(time.time())
+                    snap["ai_market_ts"] = snap["report_ts"]
+                else:
+                    log.warning("full_refresh: звіт не згенеровано: %s",
+                                (rep or {}).get("error"))
                 store.save_snapshot(snap)
             except Exception:
                 log.exception("full_refresh: ринковий звіт")

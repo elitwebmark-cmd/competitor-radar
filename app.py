@@ -117,12 +117,17 @@ def ai_market():
         cur["our_kpis"] = None
     items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
     res = ai.market_report(items, agg, our_domain=config.OUR_DOMAIN, our_kpis=cur.get("our_kpis"))
-    cur["report"] = res
-    cur["ai_market"] = res
-    cur["report_ts"] = int(time.time())
-    cur["ai_market_ts"] = cur["report_ts"]
-    store.save_snapshot(cur)
-    return jsonify({"ok": not res.get("error"), "market": res})
+    # НЕ затираємо робочий звіт помилкою: зберігаємо лише успішний результат
+    if res and not res.get("error"):
+        cur["report"] = res
+        cur["ai_market"] = res
+        cur["report_ts"] = int(time.time())
+        cur["ai_market_ts"] = cur["report_ts"]
+        store.save_snapshot(cur)
+        return jsonify({"ok": True, "market": res})
+    return jsonify({"ok": False,
+                    "error": (res.get("error") if res else "порожня відповідь AI") +
+                             " · попередній звіт збережено"}), 200
 
 
 @app.route("/market-report")

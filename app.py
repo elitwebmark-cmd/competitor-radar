@@ -110,8 +110,13 @@ def ai_market():
     import report as report_mod
     agg = report_mod.aggregates(cur)
     cur["aggregates"] = agg
+    try:
+        import windsor
+        cur["our_kpis"] = windsor.our_kpis()
+    except Exception:
+        cur["our_kpis"] = None
     items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
-    res = ai.market_report(items, agg)
+    res = ai.market_report(items, agg, our_domain=config.OUR_DOMAIN, our_kpis=cur.get("our_kpis"))
     cur["report"] = res
     cur["ai_market"] = res
     cur["report_ts"] = int(time.time())
@@ -132,7 +137,8 @@ def market_report_page():
     rep = cur.get("report") or cur.get("ai_market")
     doms = cur.get("domains") or {}
     return render_template("market_report.html", rep=rep, agg=agg, cur=cur,
-                           domains=doms, date=cur.get("date", ""), ai_on=ai.enabled())
+                           domains=doms, date=cur.get("date", ""), ai_on=ai.enabled(),
+                           our_domain=config.OUR_DOMAIN)
 
 
 # ----------------------------- сканування ---------------------------------

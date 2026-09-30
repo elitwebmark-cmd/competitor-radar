@@ -51,6 +51,12 @@ AI_MAX_IMAGES = int(os.getenv("AI_MAX_IMAGES", "6"))           # скільки 
 AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "3000"))
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "90"))
 
+# --- Наш сайт + власні KPI реклами через Windsor.ai (для плану дій) ---
+OUR_DOMAIN = os.getenv("OUR_DOMAIN", "elit-web.ua")
+WINDSOR_API_KEY = os.getenv("WINDSOR_API_KEY", "")          # ключ Windsor.ai (REST connectors API)
+WINDSOR_BASE = os.getenv("WINDSOR_BASE", "https://connectors.windsor.ai")
+WINDSOR_DATE_PRESET = os.getenv("WINDSOR_DATE_PRESET", "last_30d")
+
 # --- HTTP ---
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "12"))
 USER_AGENT = os.getenv(

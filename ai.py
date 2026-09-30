@@ -340,15 +340,25 @@ _SCHEMA_REPORT = (
     '  "threats": [{"who":"агресивний гравець","detail":"у чому загроза і як реагувати"}],\n'
     '  "recommendations": [{"title":"дія для elit-web","detail":"що саме робити, конкретно",'
     '"effect":"очікуваний ефект","priority":"висока/середня"}],\n'
-    '  "conclusion": "5-7 речень стратегічного підсумку із чіткими пріоритетами"\n'
+    '  "our_position": "4-6 речень: де САМЕ ми (elit-web) на тлі ринку — у чому сильні, '
+    'у чому відстаємо, які наші РК-метрики (якщо надані) кажуть про ефективність",\n'
+    '  "october_plan": [{"hypothesis":"гіпотеза (напр. відео-кейси піднімуть CTR)",'
+    '"test":"конкретний тест/дія на жовтень","channel":"Google/Meta/обидва",'
+    '"metric":"яку метрику дивимось (CTR, CPL, conv...)","expected":"очікуваний результат",'
+    '"priority":"висока/середня"}],\n'
+    '  "battle_verdict": "4-6 речень: як саме elit-web перевершить конкурентів у жовтні — '
+    'головний фокус місяця й чому це спрацює"\n'
     '}\n'
-    'У messaging_themes 4-6, у white_space 4-6, у recommendations 5-8 пунктів. '
-    'Використовуй надані цифри по ринку. Поверни ЛИШЕ JSON без markdown-обгортки.')
+    'У messaging_themes 4-6, у white_space 4-6, у recommendations 5-8, у october_plan 6-9 пунктів. '
+    'october_plan — конкретні гіпотези й тести саме на ЖОВТЕНЬ, щоб обійти конкурентів. '
+    'Використовуй надані цифри по ринку та наші РК-метрики. Поверни ЛИШЕ JSON без markdown-обгортки.')
 
 
-def market_report(items: list, agg: dict = None) -> dict:
-    """Повний аналітичний звіт по ринку. items: [{"domain","ai":{...розбір...}}];
-    agg: тверді агрегати з report.aggregates() (числа для точності)."""
+def market_report(items: list, agg: dict = None, our_domain: str = None,
+                  our_kpis: dict = None) -> dict:
+    """Повний аналітичний звіт по ринку + план на жовтень для elit-web.
+    items: [{"domain","ai":{...розбір...}}]; agg: тверді агрегати; our_domain: наш
+    сайт (elit-web); our_kpis: наші реальні РК-метрики з Windsor (spend/CTR/conv)."""
     if not enabled():
         return {"error": "ANTHROPIC_API_KEY не заданий"}
     lines = []
@@ -386,6 +396,21 @@ def market_report(items: list, agg: dict = None) -> dict:
             f"({', '.join(agg.get('video_advertisers') or []) or '—'})\n"
             f"- топ за обсягом: " + ", ".join(
                 f"{p['domain']} ({p['total']})" for p in (agg.get('top') or [])))
+    if our_domain:
+        ctx += (f"\n\nНАШ САЙТ (це МИ, для кого план): {our_domain}. "
+                "Усі рекомендації, our_position, october_plan і battle_verdict — саме для нас, "
+                "щоб обійти інших гравців.")
+    if our_kpis:
+        g = our_kpis.get("google") or {}
+        m = our_kpis.get("meta") or {}
+        ctx += (
+            f"\n\nНАШІ РЕАЛЬНІ РК-МЕТРИКИ ({our_kpis.get('period','30д')}, з Windsor.ai):\n"
+            f"- Google Ads: витрати {g.get('spend')}, кліки {g.get('clicks')}, покази {g.get('impressions')}, "
+            f"CTR {g.get('ctr')}%, CPC {g.get('cpc')}, конверсії {g.get('conversions')}, "
+            f"conv-rate {g.get('conv_rate')}%, CPA {g.get('cpa')}\n"
+            f"- Meta: витрати {m.get('spend')}, кліки {m.get('clicks')}, покази {m.get('impressions')}, "
+            f"CTR {m.get('ctr')}%, CPC {m.get('cpc')}\n"
+            "Спирайся на ці цифри в our_position і october_plan (де недокрут, що тестувати).")
     content = [{"type": "text", "text": ctx + "\n\n" + _SCHEMA_REPORT}]
     try:
         raw = _call(_SYS_REPORT, content, prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 8000))

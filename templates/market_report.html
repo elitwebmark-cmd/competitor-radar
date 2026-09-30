@@ -83,6 +83,23 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}
   {% if rep.market_dynamics %}<p>{{ rep.market_dynamics }}</p>{% endif %}</div>
 {% endif %}
 
+{% if rep.our_position or cur.our_kpis %}
+<div class="sec" style="border-left:3px solid var(--blue)">
+  <h2><span class="dt" style="background:var(--blue)"></span>Наша позиція ({{ our_domain }})</h2>
+  {% if cur.our_kpis %}
+  {% set g = cur.our_kpis.google or {} %}{% set m = cur.our_kpis.meta or {} %}
+  <div class="aggr" style="margin-bottom:6px">Наші РК за {{ cur.our_kpis.period or '30 днів' }} (Windsor.ai):</div>
+  <div class="rep-kpis">
+    <div class="kpi"><div class="v g">{{ g.spend }}</div><div class="l">Google Ads · витрати</div></div>
+    <div class="kpi"><div class="v">{{ g.ctr }}%</div><div class="l">Google CTR · CPC {{ g.cpc }}</div></div>
+    <div class="kpi"><div class="v vid">{{ g.conversions }}</div><div class="l">конверсій · CPA {{ g.cpa }}</div></div>
+    <div class="kpi"><div class="v m">{{ m.spend }}</div><div class="l">Meta · витрати · CTR {{ m.ctr }}%</div></div>
+  </div>
+  {% endif %}
+  {% if rep.our_position %}<p style="margin-top:10px">{{ rep.our_position }}</p>{% endif %}
+</div>
+{% endif %}
+
 {% if rep.intensity_analysis %}
 <div class="sec"><h2><span class="dt"></span>Інтенсивність реклами</h2><p>{{ rep.intensity_analysis }}</p></div>
 {% endif %}
@@ -206,6 +223,32 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}
     <div style="margin-top:6px"><a class="hlink" style="padding-left:0;color:var(--blue)" href="{{ url_for('competitor', domain=d) }}">Креативи й повний профіль →</a></div>
   </div>
   {% endfor %}
+</div>
+{% endif %}
+
+{% if rep.october_plan %}
+<div class="sec" style="border:1px solid var(--green)">
+  <h2><span class="dt" style="background:var(--green)"></span>🎯 План на жовтень — гіпотези й тести</h2>
+  <p class="mut small" style="margin-bottom:10px">Конкретні гіпотези й тести на місяць, щоб перевершити конкурентів. Кожен — з метрикою й очікуваним результатом.</p>
+  <table class="rt">
+    <thead><tr><th>Гіпотеза</th><th>Тест / дія</th><th>Канал</th><th>Метрика</th><th>Очікуємо</th><th>Пріор.</th></tr></thead>
+    <tbody>
+    {% for h in rep.october_plan %}
+      <tr>
+        <td class="d">{{ h.hypothesis if h.hypothesis is defined else h }}</td>
+        <td>{{ h.test }}</td><td>{{ h.channel }}</td><td>{{ h.metric }}</td><td>{{ h.expected }}</td>
+        <td>{% if h.priority %}<span class="agg-badge {% if 'висок' in h.priority %}p-hi{% else %}p-mid{% endif %}">{{ h.priority }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if rep.battle_verdict %}
+<div class="sec" style="border:1px solid var(--gold);background:linear-gradient(180deg,rgba(255,200,90,.06),transparent)">
+  <h2><span class="dt" style="background:var(--gold)"></span>⚔️ Як перевершити конкурентів у жовтні</h2>
+  <p style="color:var(--tx);font-weight:600;font-size:15px">{{ rep.battle_verdict }}</p>
 </div>
 {% endif %}
 

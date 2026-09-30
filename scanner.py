@@ -154,8 +154,14 @@ def full_refresh(domains=None) -> dict:
                 import report as report_mod
                 agg = report_mod.aggregates(snap)
                 snap["aggregates"] = agg
+                try:
+                    import windsor
+                    snap["our_kpis"] = windsor.our_kpis()
+                except Exception:
+                    snap["our_kpis"] = None
                 items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
-                snap["report"] = ai.market_report(items, agg)
+                snap["report"] = ai.market_report(items, agg, our_domain=config.OUR_DOMAIN,
+                                                  our_kpis=snap.get("our_kpis"))
                 snap["ai_market"] = snap["report"]          # сумісність зі старим віджетом
                 snap["report_ts"] = int(time.time())
                 snap["ai_market_ts"] = snap["report_ts"]

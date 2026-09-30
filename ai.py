@@ -338,20 +338,34 @@ _SCHEMA_REPORT = (
     '  "differentiation": ["хто і чим реально виділяється на тлі решти — розгорнуто по кожному помітному"],\n'
     '  "white_space": [{"title":"вільна ніша/оффер/меседж/формат","detail":"чому це можливість і як elit-web її зайняти"}],\n'
     '  "threats": [{"who":"агресивний гравець","detail":"у чому загроза і як реагувати"}],\n'
-    '  "recommendations": [{"title":"дія для elit-web","detail":"що саме робити, конкретно",'
-    '"effect":"очікуваний ефект","priority":"висока/середня"}],\n'
-    '  "our_position": "4-6 речень: де САМЕ ми (elit-web) на тлі ринку — у чому сильні, '
-    'у чому відстаємо, які наші РК-метрики (якщо надані) кажуть про ефективність",\n'
-    '  "october_plan": [{"hypothesis":"гіпотеза (напр. відео-кейси піднімуть CTR)",'
-    '"test":"конкретний тест/дія на жовтень","channel":"Google/Meta/обидва",'
-    '"metric":"яку метрику дивимось (CTR, CPL, conv...)","expected":"очікуваний результат",'
-    '"priority":"висока/середня"}],\n'
-    '  "battle_verdict": "4-6 речень: як саме elit-web перевершить конкурентів у жовтні — '
-    'головний фокус місяця й чому це спрацює"\n'
+    '  "conclusion": "5-7 речень стратегічного підсумку по ринку"\n'
     '}\n'
-    'У messaging_themes 4-6, у white_space 4-6, у recommendations 5-8, у october_plan 6-9 пунктів. '
-    'october_plan — конкретні гіпотези й тести саме на ЖОВТЕНЬ, щоб обійти конкурентів. '
-    'Використовуй надані цифри по ринку та наші РК-метрики. Поверни ЛИШЕ JSON без markdown-обгортки.')
+    'У messaging_themes 4-6, у white_space 4-6 пунктів. '
+    'Використовуй надані цифри по ринку. Поверни ЛИШЕ JSON без markdown-обгортки.')
+
+
+# Окремий фокусний виклик під план дій — щоб він НІКОЛИ не губився через розмір.
+_SYS_PLAN = (
+    "Ти — head of performance агенції elit-web. На основі аналізу ринку реклами "
+    "конкурентів і НАШИХ реальних РК-метрик склади бойовий план на жовтень, щоб "
+    "перевершити конкурентів. Пиши українською, конкретно, з цифрами. "
+    "Відповідай ВИКЛЮЧНО валідним JSON без markdown.")
+
+_SCHEMA_PLAN = (
+    'Поверни JSON рівно з такими ключами:\n'
+    '{\n'
+    '  "our_position": "4-6 речень: де САМЕ ми (elit-web) на тлі ринку — сильні/слабкі '
+    'сторони, що кажуть наші РК-метрики (CTR/CPC/конверсії/CPA) про ефективність і недокрут",\n'
+    '  "recommendations": [{"title":"стратегічна дія для elit-web","detail":"що саме робити",'
+    '"effect":"очікуваний ефект","priority":"висока/середня"}],\n'
+    '  "october_plan": [{"hypothesis":"гіпотеза (напр. відео-кейси піднімуть CTR)",'
+    '"test":"конкретний тест/дія на ЖОВТЕНЬ","channel":"Google/Meta/обидва",'
+    '"metric":"метрика (CTR, CPL, conv-rate, CPA...)","expected":"очікуваний результат у цифрах",'
+    '"priority":"висока/середня"}],\n'
+    '  "battle_verdict": "4-6 речень: головний фокус жовтня й ЧОМУ це дасть нам перевагу над конкурентами"\n'
+    '}\n'
+    'У recommendations 5-8, у october_plan 6-9 конкретних пунктів. Спирайся на наші реальні '
+    'РК-метрики та дані ринку. Поверни ЛИШЕ JSON.')
 
 
 def market_report(items: list, agg: dict = None, our_domain: str = None,
@@ -411,11 +425,67 @@ def market_report(items: list, agg: dict = None, our_domain: str = None,
             f"- Meta: витрати {m.get('spend')}, кліки {m.get('clicks')}, покази {m.get('impressions')}, "
             f"CTR {m.get('ctr')}%, CPC {m.get('cpc')}\n"
             "Спирайся на ці цифри в our_position і october_plan (де недокрут, що тестувати).")
+    # --- виклик 1: аналіз ринку ---
     content = [{"type": "text", "text": ctx + "\n\n" + _SCHEMA_REPORT}]
     try:
-        raw = _call(_SYS_REPORT, content, prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 8000))
+        raw = _call(_SYS_REPORT, content, prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 6000))
     except Exception as e:
         log.exception("market_report")
         return {"error": str(e)[:200]}
     out = _parse_json(raw)
-    return out or {"error": "не вдалося розібрати відповідь AI: " + ((raw or "порожньо")[:200])}
+    if not out:
+        return {"error": "не вдалося розібрати відповідь AI: " + ((raw or "порожньо")[:200])}
+
+    # --- виклик 2: план дій на жовтень (окремо, щоб не губився) ---
+    try:
+        plan_ctx = ctx + "\n\n" + _SCHEMA_PLAN
+        raw2 = _call(_SYS_PLAN, [{"type": "text", "text": plan_ctx}],
+                     prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 4000))
+        plan = _parse_json(raw2)
+    except Exception:
+        log.exception("market_report: план")
+        plan = {}
+    for k in ("our_position", "recommendations", "october_plan", "battle_verdict"):
+        if plan.get(k):
+            out[k] = plan[k]
+    # fallback-план, якщо AI не дав (щоб блок був завжди)
+    if not out.get("october_plan"):
+        out["october_plan"] = _fallback_october_plan(agg, our_kpis)
+    if not out.get("recommendations"):
+        out["recommendations"] = _fallback_recs(agg)
+    return out
+
+
+def _fallback_october_plan(agg: dict, our_kpis: dict) -> list:
+    fs = (agg or {}).get("format_shares") or {}
+    plan = [
+        {"hypothesis": "Відео-креативи піднімуть CTR і знизять CPC vs статики",
+         "test": "Запустити 4–6 відео-крео (кейси/відгуки) в Meta й Google Video",
+         "channel": "обидва", "metric": "CTR, CPC", "expected": "CTR +20–40%", "priority": "висока"},
+        {"hypothesis": "Оффер із гарантією KPI виділить нас серед «безкоштовних аудитів»",
+         "test": "A/B тест лендінгу з оффером «результат або повертаємо»",
+         "channel": "Google", "metric": "conv-rate, CPL", "expected": "CPL −15%", "priority": "висока"},
+        {"hypothesis": "Ремаркетинг на відвідувачів конкурентних запитів дає дешеві ліди",
+         "test": "Налаштувати RLSA + Meta-ремаркетинг на теплу аудиторію",
+         "channel": "обидва", "metric": "CPA", "expected": "CPA −20%", "priority": "середня"},
+        {"hypothesis": "Розширення семантики на недокручені кластери дасть новий трафік",
+         "test": "Додати кампанії під ніші, де конкуренти слабкі",
+         "channel": "Google", "metric": "impressions, leads", "expected": "+заявки", "priority": "середня"},
+    ]
+    if our_kpis and (our_kpis.get("meta") or {}).get("conv_rate") in (None, 0):
+        plan.insert(1, {"hypothesis": "Meta зараз працює лише на трафік — конверсійні кампанії дадуть ліди",
+                        "test": "Запустити Meta lead/conversion кампанії з формою й офером",
+                        "channel": "Meta", "metric": "конверсії, CPL", "expected": "перші ліди з Meta",
+                        "priority": "висока"})
+    return plan
+
+
+def _fallback_recs(agg: dict) -> list:
+    return [
+        {"title": "Посилити відео", "detail": "Ринок недокручує відео — зайняти цей формат першими.",
+         "effect": "вища залученість, нижчий CPC", "priority": "висока"},
+        {"title": "Унікальний оффер", "detail": "Вийти за межі «безкоштовного аудиту» — гарантія результату.",
+         "effect": "виділення серед конкурентів", "priority": "висока"},
+        {"title": "Балансувати канали", "detail": "Підключити недовикористаний канал під конверсії.",
+         "effect": "дешевші ліди", "priority": "середня"},
+    ]

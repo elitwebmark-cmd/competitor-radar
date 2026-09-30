@@ -96,16 +96,19 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}
 <div class="sec"><h2><span class="dt"></span>Карта позиціонування ринку</h2><ul>{% for x in rep.positioning_map %}<li>{{ x }}</li>{% endfor %}</ul></div>
 {% endif %}
 
-{% if rep.players %}
+{% if agg and agg.per_competitor %}
 <div class="sec">
   <h2><span class="dt"></span>Гравці ринку · позиціонування</h2>
   <table class="rt">
-    <thead><tr><th>Конкурент</th><th>Позиціонування</th><th>Активність</th><th>Головний оффер</th><th>Канал</th><th>Чим виділяється</th></tr></thead>
+    <thead><tr><th>Конкурент</th><th>Позиціонування</th><th>Оголошень</th><th>Канал</th><th>Чим виділяється</th></tr></thead>
     <tbody>
-    {% for p in rep.players %}
-      <tr><td class="d">{{ p.domain }}</td><td>{{ p.positioning }}</td>
-        <td>{{ p.aggressiveness }}</td><td>{{ p.main_offer }}</td>
-        <td>{{ p.channel_focus }}</td><td>{{ p.stands_out }}</td></tr>
+    {% for p in agg.per_competitor %}
+      {% set pa = (domains.get(p.domain) or {}).get('ai') or {} %}
+      <tr><td class="d">{{ p.domain }}</td>
+        <td>{{ (pa.positioning or pa.utp) if not pa.error else '—' }}</td>
+        <td class="d">{{ p.total }}</td>
+        <td>{% if p.g_running and p.m_running %}обидва{% elif p.g_running %}Google{% elif p.m_running %}Meta{% else %}—{% endif %}</td>
+        <td>{{ pa.stands_out if not pa.error else '—' }}</td></tr>
     {% endfor %}
     </tbody>
   </table>

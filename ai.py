@@ -4,6 +4,7 @@
 Плюс ринковий огляд по всіх конкурентах."""
 from __future__ import annotations
 import json
+import re
 import base64
 import logging
 
@@ -114,17 +115,74 @@ def _call(system: str, content: list, prefill: str = "", max_tokens: int = None)
 
 def _parse_json(text: str) -> dict:
     t = (text or "").strip()
-    if t.startswith("```"):
-        t = t.split("```", 2)[1]
-        if t.lstrip().lower().startswith("json"):
-            t = t.split("\n", 1)[1] if "\n" in t else t
-    a, b = t.find("{"), t.rfind("}")
-    if a >= 0 and b > a:
-        t = t[a:b + 1]
+    # прибрати code-fence (```json ... ``` або незакритий ```json на початку)
+    if "```" in t:
+        m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S)
+        t = (m.group(1) if m else t.replace("```json", "").replace("```", "")).strip()
+    a = t.find("{")
+    if a < 0:
+        return {}
+    t = t[a:]
+    # 1) як є
     try:
         return json.loads(t)
     except Exception:
-        return {}
+        pass
+    # 2) до останньої '}'
+    b = t.rfind("}")
+    if b > 0:
+        try:
+            return json.loads(t[:b + 1])
+        except Exception:
+            pass
+    # 3) рятуємо обрізаний JSON: обрізаємо до останньої «безпечної» точки
+    #    (закрита структура }] або кома між елементами поза рядком) і добалансовуємо дужки.
+    def _balance(frag: str) -> str:
+        st, ins, es = [], False, False
+        for ch in frag:
+            if es:
+                es = False
+                continue
+            if ch == "\\" and ins:
+                es = True
+                continue
+            if ch == '"':
+                ins = not ins
+                continue
+            if ins:
+                continue
+            if ch in "{[":
+                st.append("}" if ch == "{" else "]")
+            elif ch in "}]":
+                if st:
+                    st.pop()
+        if ins:
+            frag += '"'
+        return frag + "".join(reversed(st))
+
+    instr, esc, safe = False, False, -1
+    for i, ch in enumerate(t):
+        if esc:
+            esc = False
+            continue
+        if ch == "\\" and instr:
+            esc = True
+            continue
+        if ch == '"':
+            instr = not instr
+            continue
+        if instr:
+            continue
+        if ch in "}]":
+            safe = i + 1          # після закритої структури — безпечно
+        elif ch == ",":
+            safe = i              # перед комою — безпечно (відкидаємо неповний елемент)
+    if safe > 0:
+        try:
+            return json.loads(_balance(t[:safe].rstrip().rstrip(",")))
+        except Exception:
+            pass
+    return {}
 
 
 # --------------------------- аналіз одного ---------------------------------
@@ -269,10 +327,6 @@ _SCHEMA_REPORT = (
     'де недокрут",\n'
     '  "segments_targeting": "4-6 речень: на які сегменти/ніші/типи клієнтів таргетує ринок, '
     'хто які сегменти зайняв, де конкуренція за аудиторію найвища",\n'
-    '  "players": [{"domain":"...","positioning":"розгорнуто як позиціонується",'
-    '"aggressiveness":"високий/середній/низький","main_offer":"головний оффер",'
-    '"messaging":"на що тиснуть","formats":"які формати/акцент","channel_focus":"Google/Meta/обидва",'
-    '"stands_out":"чим виділяється","weakness":"слабке місце"}],\n'
     '  "positioning_map": ["кластери позиціонування ринку: напр. \'перформанс з фокусом на ROI: X, Y\'; '
     '\'SEO за результат: Z\'; \'комплексний діджитал: ...\' — згрупуй гравців за типом позиціонування"],\n'
     '  "offers_landscape": {"common":["оффери/меседжі, що повторюються в багатьох — з поясненням"],'
@@ -288,8 +342,8 @@ _SCHEMA_REPORT = (
     '"effect":"очікуваний ефект","priority":"висока/середня"}],\n'
     '  "conclusion": "5-7 речень стратегічного підсумку із чіткими пріоритетами"\n'
     '}\n'
-    'У players — ОБОВʼЯЗКОВО всі конкуренти з даних. У messaging_themes 4-6, у white_space 4-6, '
-    'у recommendations 5-8 пунктів. Використовуй надані цифри по ринку.')
+    'У messaging_themes 4-6, у white_space 4-6, у recommendations 5-8 пунктів. '
+    'Використовуй надані цифри по ринку. Поверни ЛИШЕ JSON без markdown-обгортки.')
 
 
 def market_report(items: list, agg: dict = None) -> dict:
@@ -334,7 +388,7 @@ def market_report(items: list, agg: dict = None) -> dict:
                 f"{p['domain']} ({p['total']})" for p in (agg.get('top') or [])))
     content = [{"type": "text", "text": ctx + "\n\n" + _SCHEMA_REPORT}]
     try:
-        raw = _call(_SYS_REPORT, content, prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 6000))
+        raw = _call(_SYS_REPORT, content, prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 8000))
     except Exception as e:
         log.exception("market_report")
         return {"error": str(e)[:200]}

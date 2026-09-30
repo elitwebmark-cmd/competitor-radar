@@ -63,10 +63,12 @@ def dashboard():
     prev = store.previous()
     data = store.compute_deltas(cur, prev) if cur else None
     snaps = store.list_snapshots()
+    rep = (cur.get("report") or cur.get("ai_market")) if cur else None
     return render_template("dashboard.html", data=data, cur=cur,
                            status=scanner.get_status(), snaps=snaps[:14],
                            competitors=config.COMPETITORS, ai_on=ai.enabled(),
-                           market=(cur.get("ai_market") if cur else None))
+                           market=rep, agg=(cur.get("aggregates") if cur else None),
+                           has_report=bool(rep and not rep.get("error")))
 
 
 @app.route("/competitor/<path:domain>")
@@ -100,17 +102,37 @@ def competitor_ai(domain):
 @app.route("/ai-market", methods=["POST"])
 @login_required
 def ai_market():
-    """Ринковий огляд по вже проаналізованих конкурентах (кешується у знімок)."""
+    """Повний ринковий звіт по вже проаналізованих конкурентах (кешується у знімок)."""
     cur = store.latest()
     doms = (cur or {}).get("domains") or {}
     if not doms:
         return jsonify({"ok": False, "error": "немає зрізу"}), 400
+    import report as report_mod
+    agg = report_mod.aggregates(cur)
+    cur["aggregates"] = agg
     items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
-    res = ai.analyze_market(items)
+    res = ai.market_report(items, agg)
+    cur["report"] = res
     cur["ai_market"] = res
-    cur["ai_market_ts"] = int(time.time())
+    cur["report_ts"] = int(time.time())
+    cur["ai_market_ts"] = cur["report_ts"]
     store.save_snapshot(cur)
     return jsonify({"ok": not res.get("error"), "market": res})
+
+
+@app.route("/market-report")
+@login_required
+def market_report_page():
+    """Повний аналітичний звіт по ринку реклами (єдиний глобальний звіт)."""
+    cur = store.latest()
+    if not cur:
+        return redirect(url_for("dashboard"))
+    import report as report_mod
+    agg = cur.get("aggregates") or report_mod.aggregates(cur)
+    rep = cur.get("report") or cur.get("ai_market")
+    doms = cur.get("domains") or {}
+    return render_template("market_report.html", rep=rep, agg=agg, cur=cur,
+                           domains=doms, date=cur.get("date", ""), ai_on=ai.enabled())
 
 
 # ----------------------------- сканування ---------------------------------

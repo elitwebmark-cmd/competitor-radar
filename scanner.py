@@ -148,15 +148,20 @@ def full_refresh(domains=None) -> dict:
                 store.save_snapshot(snap)               # прогресивне збереження
                 with _STATUS_LOCK:
                     STATUS["done"] += 1
-            # фаза 3 — ринковий огляд
+            # фаза 3 — повний ринковий звіт (агрегати-числа + AI-аналітика)
             _set(phase="market", current="")
             try:
+                import report as report_mod
+                agg = report_mod.aggregates(snap)
+                snap["aggregates"] = agg
                 items = [{"domain": d, "ai": (r.get("ai") or {})} for d, r in doms.items()]
-                snap["ai_market"] = ai.analyze_market(items)
-                snap["ai_market_ts"] = int(time.time())
+                snap["report"] = ai.market_report(items, agg)
+                snap["ai_market"] = snap["report"]          # сумісність зі старим віджетом
+                snap["report_ts"] = int(time.time())
+                snap["ai_market_ts"] = snap["report_ts"]
                 store.save_snapshot(snap)
             except Exception:
-                log.exception("full_refresh: ринковий огляд")
+                log.exception("full_refresh: ринковий звіт")
         else:
             log.info("full_refresh: AI вимкнено (немає ANTHROPIC_API_KEY) — лише реклама")
         _set(running=False, phase="done", finished=int(time.time()), current="")

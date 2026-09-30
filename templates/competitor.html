@@ -57,14 +57,26 @@ h1.dh{font-size:24px;margin:0 0 4px}
     <div class="off" style="color:var(--red)">Помилка аналізу: {{ a.error }}. Спробуйте ще раз.</div>
   {% elif a %}
     {% if a.summary %}<p style="margin:2px 0 14px;font-size:15px;font-weight:600">{{ a.summary }}</p>{% endif %}
+    {% if a.positioning or a.utp %}<div class="aic wide"><div class="ail">Позиціонування / УТП</div><div class="aitx">{{ a.positioning or a.utp }}</div></div>{% endif %}
     <div class="aigrid">
       {% if a.services %}<div class="aic"><div class="ail">Послуги</div><div>{% for s in a.services %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
-      {% if a.directions %}<div class="aic"><div class="ail">Напрямки / ніші</div><div>{% for s in a.directions %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
-      {% if a.landing_focus %}<div class="aic"><div class="ail">Що просувають найактивніше</div><div>{% for s in a.landing_focus %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
+      {% if a.target_segments or a.directions %}<div class="aic"><div class="ail">Сегменти / на кого таргетують</div><div>{% for s in (a.target_segments or a.directions) %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
+      {% if a.ctas %}<div class="aic"><div class="ail">Заклики до дії (CTA)</div><div>{% for s in a.ctas %}<span class="badge">{{ s }}</span>{% endfor %}</div></div>{% endif %}
     </div>
-    {% if a.utp %}<div class="aic wide"><div class="ail">УТП / позиціонування</div><div class="aitx">{{ a.utp }}</div></div>{% endif %}
-    {% if a.offers %}<div class="aic wide"><div class="ail">Оффери / акції</div><ul class="aiul">{% for s in a.offers %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
-    {% if a.messaging %}<div class="aic wide"><div class="ail">Меседжі / болі</div><ul class="aiul">{% for s in a.messaging %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.activity_level or a.format_focus %}
+    <div class="aigrid">
+      {% if a.activity_level %}<div class="aic"><div class="ail">Рівень активності</div><div class="aitx">{{ a.activity_level }}</div></div>{% endif %}
+      {% if a.format_focus %}<div class="aic"><div class="ail">Акцент по формату</div><div class="aitx">{{ a.format_focus }}</div></div>{% endif %}
+      {% if a.tone %}<div class="aic"><div class="ail">Тон меседжів</div><div class="aitx">{{ a.tone }}</div></div>{% endif %}
+    </div>
+    {% endif %}
+    {% if a.offers %}<div class="aic wide"><div class="ail">Оффери / акції / ціни</div><ul class="aiul">{% for s in a.offers %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.usp %}<div class="aic wide"><div class="ail">Унікальні переваги</div><ul class="aiul">{% for s in a.usp %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.messaging_angles or a.messaging %}<div class="aic wide"><div class="ail">Меседжі / кути / болі</div><ul class="aiul">{% for s in (a.messaging_angles or a.messaging) %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+    {% if a.ad_formats %}<div class="aic wide"><div class="ail">Формати реклами (по молекулах)</div><div class="aitx">{{ a.ad_formats if a.ad_formats is string else a.ad_formats|join(' · ') }}</div></div>{% endif %}
+    {% if a.creative_style %}<div class="aic wide"><div class="ail">Стиль креативів</div><div class="aitx">{{ a.creative_style }}</div></div>{% endif %}
+    {% if a.stands_out %}<div class="aic wide"><div class="ail">Чим виділяється</div><div class="aitx">{{ a.stands_out }}</div></div>{% endif %}
+    {% if a.weak_spots %}<div class="aic wide"><div class="ail">Слабкі місця в рекламі</div><ul class="aiul">{% for s in a.weak_spots %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
     {% if a.channels %}<div class="aic wide"><div class="ail">Канали</div><div class="aitx">{{ a.channels }}</div></div>{% endif %}
   {% else %}
     <div class="off">Натисніть «Запустити аналіз» — Claude прочитає скріншоти Google-оголошень і тексти Meta й опише послуги, напрямки, оффери та УТП конкурента.</div>

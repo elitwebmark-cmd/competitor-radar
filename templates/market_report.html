@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Звіт по ринку · Competitor Radar{% endblock %}
+{% block head %}
+<style>
+.rep-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+.rep-head h1{font-size:24px;margin:0 0 4px}
+.rep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0 6px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .v{font-size:26px;font-weight:900;letter-spacing:-.5px}
+.kpi .l{color:var(--mute);font-size:12px;font-weight:700;margin-top:4px}
+.kpi .v.g{color:var(--blue)} .kpi .v.m{color:var(--red)} .kpi .v.vid{color:var(--gold)}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0}
+.sec h2{font-size:16px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.sec h2 .dt{width:9px;height:9px;background:var(--red);border-radius:2px;display:inline-block}
+.sec p{margin:6px 0;color:var(--mute2)}
+.sec ul{margin:6px 0;padding-left:18px} .sec li{margin:4px 0;color:var(--mute2)}
+.bars{margin:8px 0}
+.bar-row{display:flex;align-items:center;gap:10px;margin:6px 0}
+.bar-row .nm{width:150px;font-size:13px;font-weight:700}
+.bar-track{flex:1;height:16px;background:var(--card2);border-radius:6px;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px}
+.bar-row .vv{width:56px;text-align:right;font-weight:800;font-size:13px}
+table.rt{width:100%;border-collapse:collapse;font-size:13px}
+.rt th{text-align:left;color:var(--mute);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--line)}
+.rt td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--mute2)}
+.rt td.d{color:var(--tx);font-weight:800}
+.agg-badge{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:var(--card2);border:1px solid var(--line)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+.rec{border:1px solid var(--line);border-left:3px solid var(--green);border-radius:9px;padding:10px 13px;margin:7px 0;background:var(--card2)}
+.rec .t{font-weight:800;margin-bottom:2px}
+.rec .p-hi{color:var(--red)} .rec .p-mid{color:var(--gold)}
+.aggr{color:var(--mute);font-size:12px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="rep-head">
+  <div>
+    <h1>📊 Аналітичний звіт по ринку реклами</h1>
+    <div class="mut small">Діджитал-агенції України · зріз {{ date }} UTC · {{ (domains|length) }} конкурентів{% if cur.report_ts %} · звіт згенеровано{% endif %}</div>
+  </div>
+  <div class="sp" style="flex:1"></div>
+  <a class="hlink" href="{{ url_for('dashboard') }}">← Дашборд</a>
+</div>
+
+{% if not rep or rep.error %}
+<div class="sec"><p style="color:var(--red)">{% if rep and rep.error %}{{ rep.error }}{% else %}Звіт ще не згенеровано. На дашборді натисніть «Аналіз ринку одним кліком».{% endif %}</p></div>
+{% else %}
+
+{% if agg %}
+<div class="rep-kpis">
+  <div class="kpi"><div class="v">{{ agg.total_ads }}</div><div class="l">оголошень у вибірці</div></div>
+  <div class="kpi"><div class="v g">{{ agg.active_google }}/{{ agg.n }}</div><div class="l">крутять Google Ads</div></div>
+  <div class="kpi"><div class="v m">{{ agg.active_meta }}/{{ agg.n }}</div><div class="l">крутять Meta (FB/IG)</div></div>
+  <div class="kpi"><div class="v vid">{{ agg.video_share_players }}%</div><div class="l">гравців із відео</div></div>
+</div>
+
+<div class="sec">
+  <h2><span class="dt"></span>Розподіл реклами по ринку</h2>
+  <div class="two">
+    <div>
+      <div class="aggr">Канали (частка оголошень)</div>
+      <div class="bars">
+        <div class="bar-row"><span class="nm">Google Ads</span><div class="bar-track"><div class="bar-fill" style="width:{{ agg.channel_split.google }}%;background:var(--blue)"></div></div><span class="vv">{{ agg.channel_split.google }}%</span></div>
+        <div class="bar-row"><span class="nm">Meta (FB/IG)</span><div class="bar-track"><div class="bar-fill" style="width:{{ agg.channel_split.meta }}%;background:var(--red)"></div></div><span class="vv">{{ agg.channel_split.meta }}%</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="aggr">Формати креативів</div>
+      <div class="bars">
+        {% set fc = {'image':['Статичні банери','var(--gold)'],'video':['Відео','var(--green)'],'text':['Текст / пошук','var(--blue)'],'other':['Інше','var(--mute)']} %}
+        {% for k,meta in fc.items() %}
+        <div class="bar-row"><span class="nm">{{ meta[0] }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ agg.format_shares[k] }}%;background:{{ meta[1] }}"></div></div><span class="vv">{{ agg.format_shares[k] }}%</span></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if rep.executive_summary %}
+<div class="sec"><h2><span class="dt"></span>Головне</h2><p style="font-weight:600;color:var(--tx)">{{ rep.executive_summary }}</p>
+  {% if rep.market_dynamics %}<p>{{ rep.market_dynamics }}</p>{% endif %}</div>
+{% endif %}
+
+{% if rep.players %}
+<div class="sec">
+  <h2><span class="dt"></span>Гравці ринку · позиціонування</h2>
+  <table class="rt">
+    <thead><tr><th>Конкурент</th><th>Позиціонування</th><th>Активність</th><th>Головний оффер</th><th>Канал</th><th>Чим виділяється</th></tr></thead>
+    <tbody>
+    {% for p in rep.players %}
+      <tr><td class="d">{{ p.domain }}</td><td>{{ p.positioning }}</td>
+        <td>{{ p.aggressiveness }}</td><td>{{ p.main_offer }}</td>
+        <td>{{ p.channel_focus }}</td><td>{{ p.stands_out }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="two">
+  {% if rep.offers_landscape and rep.offers_landscape.common %}
+  <div class="sec"><h2><span class="dt"></span>Спільні оффери й меседжі</h2><ul>{% for x in rep.offers_landscape.common %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  {% if rep.offers_landscape and rep.offers_landscape.unique %}
+  <div class="sec"><h2><span class="dt"></span>Унікальні ходи (лише в когось)</h2><ul>{% for x in rep.offers_landscape.unique %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  {% endif %}
+</div>
+
+{% if rep.messaging_themes %}
+<div class="sec"><h2><span class="dt"></span>Домінуючі меседжі / кути на ринку</h2><ul>{% for x in rep.messaging_themes %}<li>{{ x }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+{% if rep.formats_landscape %}
+<div class="sec"><h2><span class="dt"></span>Формати реклами по ринку</h2><p>{{ rep.formats_landscape }}</p>
+  {% if agg and agg.video_advertisers %}<p class="aggr">Крутять відео: {{ agg.video_advertisers|join(', ') }}</p>{% endif %}</div>
+{% endif %}
+
+<div class="two">
+  {% if rep.differentiation %}
+  <div class="sec"><h2><span class="dt"></span>Хто і чим виділяється</h2><ul>{% for x in rep.differentiation %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  {% if rep.threats %}
+  <div class="sec"><h2><span class="dt"></span>Загрози / агресивні гравці</h2><ul>{% for x in rep.threats %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  {% endif %}
+</div>
+
+{% if rep.white_space %}
+<div class="sec"><h2><span class="dt"></span>Вільні ніші й можливості (white space)</h2><ul>{% for x in rep.white_space %}<li>{{ x }}</li>{% endfor %}</ul></div>
+{% endif %}
+
+{% if rep.recommendations %}
+<div class="sec"><h2><span class="dt"></span>План дій для elit-web</h2>
+  {% for r in rep.recommendations %}
+    {% if r.title is defined %}
+    <div class="rec"><div class="t">{{ loop.index }}. {{ r.title }}{% if r.priority %} <span class="agg-badge {% if 'висок' in r.priority %}p-hi{% else %}p-mid{% endif %}">{{ r.priority }}</span>{% endif %}</div><div class="mut2">{{ r.detail }}</div></div>
+    {% else %}<div class="rec"><div class="mut2">{{ r }}</div></div>{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if rep.conclusion %}
+<div class="sec" style="border-left:3px solid var(--red)"><h2><span class="dt"></span>Висновок</h2><p style="color:var(--tx)">{{ rep.conclusion }}</p></div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

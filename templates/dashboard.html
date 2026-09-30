@@ -60,8 +60,8 @@ i.lg.g{background:#4c9ffe}i.lg.m{background:#f78fb3}
     </div>
   </div>
   <div class="sp"></div>
-  <button class="btn ghost" id="refreshBtn" onclick="startScan()">🔄 Оновити рекламу</button>
-  <button class="btn" id="fullBtn" onclick="startFull()">🧠 Повне оновлення (реклама + AI)</button>
+  <button class="btn ghost" id="refreshBtn" onclick="startScan()">🔄 Тільки реклама</button>
+  <button class="btn" id="fullBtn" onclick="startFull()">🧠 Аналіз ринку одним кліком (реклама + AI + звіт)</button>
 </div>
 
 <div class="progress" id="prog">
@@ -94,19 +94,20 @@ i.lg.g{background:#4c9ffe}i.lg.m{background:#f78fb3}
 </div>
 
 <div class="mkt">
-  <div class="mkt-h"><h2>🧭 Ринковий AI-огляд</h2>
-    {% if ai_on %}<button class="btn ghost" id="mktBtn" onclick="runMarket()" style="margin-left:auto;font-size:12px;padding:6px 12px">{% if market and not market.error %}↻ Оновити{% else %}Згенерувати{% endif %}</button>{% endif %}</div>
+  <div class="mkt-h"><h2>🧭 Ринковий AI-звіт</h2>
+    {% if has_report %}<a class="btn" href="{{ url_for('market_report_page') }}" style="margin-left:auto;font-size:13px;padding:8px 14px">📊 Відкрити повний звіт по ринку</a>{% endif %}
+    {% if ai_on %}<button class="btn ghost" id="mktBtn" onclick="runMarket()" style="margin-left:{% if not has_report %}auto{% else %}8px{% endif %};font-size:12px;padding:6px 12px">{% if has_report %}↻ Перегенерувати{% else %}Згенерувати звіт{% endif %}</button>{% endif %}</div>
   {% if not ai_on %}<div class="mut small">AI вимкнено (немає <code>ANTHROPIC_API_KEY</code>).</div>
   {% elif market and market.error %}<div class="small" style="color:var(--red)">{{ market.error }}</div>
-  {% elif market %}
-    {% if market.summary %}<p style="margin:2px 0 12px;font-weight:600">{{ market.summary }}</p>{% endif %}
+  {% elif has_report %}
+    {% if market.executive_summary %}<p style="margin:2px 0 10px;font-weight:600">{{ market.executive_summary }}</p>{% endif %}
+    {% if agg %}<div class="small mut" style="margin-bottom:10px">Оголошень у вибірці: <b style="color:var(--tx)">{{ agg.total_ads }}</b> (Google {{ agg.channel_split.google }}% / Meta {{ agg.channel_split.meta }}%) · відео {{ agg.format_shares.video }}% · статичні банери {{ agg.format_shares.image }}% · гравців із відео {{ agg.video_share_players }}%</div>{% endif %}
     <div class="mkt-grid">
-      {% if market.leaders %}<div class="mkt-c"><div class="ail">Лідери</div><ul>{% for x in market.leaders %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
-      {% if market.common_offers %}<div class="mkt-c"><div class="ail">Спільні оффери / меседжі</div><ul>{% for x in market.common_offers %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
-      {% if market.gaps %}<div class="mkt-c"><div class="ail">Вільні ніші (можливості)</div><ul>{% for x in market.gaps %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
-      {% if market.recommendations %}<div class="mkt-c"><div class="ail">Рекомендації elit-web</div><ul>{% for x in market.recommendations %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if market.white_space %}<div class="mkt-c"><div class="ail">Вільні ніші (можливості)</div><ul>{% for x in market.white_space[:4] %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if market.recommendations %}<div class="mkt-c"><div class="ail">Рекомендації elit-web</div><ul>{% for x in market.recommendations[:4] %}<li>{{ x.title if x.title is defined else x }}</li>{% endfor %}</ul></div>{% endif %}
     </div>
-  {% else %}<div class="mut small">Спочатку зроби AI-аналіз кількох конкурентів (на їх сторінках), потім згенеруй ринковий огляд.</div>{% endif %}
+    <div style="margin-top:10px"><a class="hlink" href="{{ url_for('market_report_page') }}" style="color:var(--red);padding-left:0">Повний звіт: гравці, оффери, формати, диференціація, загрози, план дій →</a></div>
+  {% else %}<div class="mut small">Натисніть «Аналіз ринку одним кліком» — сервіс просканує рекламу всіх конкурентів, зробить AI-розбір кожного й збере повний звіт по ринку.</div>{% endif %}
 </div>
 
 {% set ns = namespace(mx=1) %}

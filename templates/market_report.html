@@ -83,6 +83,19 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}
   {% if rep.market_dynamics %}<p>{{ rep.market_dynamics }}</p>{% endif %}</div>
 {% endif %}
 
+{% if rep.intensity_analysis %}
+<div class="sec"><h2><span class="dt"></span>Інтенсивність реклами</h2><p>{{ rep.intensity_analysis }}</p></div>
+{% endif %}
+
+<div class="two">
+  {% if rep.channel_strategy %}<div class="sec"><h2><span class="dt"></span>Стратегія каналів (Google vs Meta)</h2><p>{{ rep.channel_strategy }}</p></div>{% endif %}
+  {% if rep.segments_targeting %}<div class="sec"><h2><span class="dt"></span>Сегменти й таргетинг</h2><p>{{ rep.segments_targeting }}</p></div>{% endif %}
+</div>
+
+{% if rep.positioning_map %}
+<div class="sec"><h2><span class="dt"></span>Карта позиціонування ринку</h2><ul>{% for x in rep.positioning_map %}<li>{{ x }}</li>{% endfor %}</ul></div>
+{% endif %}
+
 {% if rep.players %}
 <div class="sec">
   <h2><span class="dt"></span>Гравці ринку · позиціонування</h2>
@@ -109,7 +122,12 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}
 </div>
 
 {% if rep.messaging_themes %}
-<div class="sec"><h2><span class="dt"></span>Домінуючі меседжі / кути на ринку</h2><ul>{% for x in rep.messaging_themes %}<li>{{ x }}</li>{% endfor %}</ul></div>
+<div class="sec"><h2><span class="dt"></span>Домінуючі меседжі / кути на ринку</h2>
+  <ul>{% for x in rep.messaging_themes %}<li>{% if x.theme is defined %}<b style="color:var(--tx)">{{ x.theme }}</b>{% if x.detail %} — {{ x.detail }}{% endif %}{% else %}{{ x }}{% endif %}</li>{% endfor %}</ul></div>
+{% endif %}
+
+{% if rep.offers_landscape and rep.offers_landscape.pricing %}
+<div class="sec"><h2><span class="dt"></span>Ціни й моделі оплати на ринку</h2><p>{{ rep.offers_landscape.pricing }}</p></div>
 {% endif %}
 
 {% if rep.formats_landscape %}
@@ -122,20 +140,68 @@ table.rt{width:100%;border-collapse:collapse;font-size:13px}
   <div class="sec"><h2><span class="dt"></span>Хто і чим виділяється</h2><ul>{% for x in rep.differentiation %}<li>{{ x }}</li>{% endfor %}</ul></div>
   {% endif %}
   {% if rep.threats %}
-  <div class="sec"><h2><span class="dt"></span>Загрози / агресивні гравці</h2><ul>{% for x in rep.threats %}<li>{{ x }}</li>{% endfor %}</ul></div>
+  <div class="sec"><h2><span class="dt"></span>Загрози / агресивні гравці</h2><ul>{% for x in rep.threats %}<li>{% if x.who is defined %}<b style="color:var(--tx)">{{ x.who }}</b>{% if x.detail %} — {{ x.detail }}{% endif %}{% else %}{{ x }}{% endif %}</li>{% endfor %}</ul></div>
   {% endif %}
 </div>
 
 {% if rep.white_space %}
-<div class="sec"><h2><span class="dt"></span>Вільні ніші й можливості (white space)</h2><ul>{% for x in rep.white_space %}<li>{{ x }}</li>{% endfor %}</ul></div>
+<div class="sec"><h2><span class="dt"></span>Вільні ніші й можливості (white space)</h2>
+  {% for x in rep.white_space %}
+    {% if x.title is defined %}<div class="rec" style="border-left-color:var(--gold)"><div class="t">{{ x.title }}</div><div class="mut2">{{ x.detail }}</div></div>
+    {% else %}<div class="rec" style="border-left-color:var(--gold)"><div class="mut2">{{ x }}</div></div>{% endif %}
+  {% endfor %}
+</div>
 {% endif %}
 
 {% if rep.recommendations %}
 <div class="sec"><h2><span class="dt"></span>План дій для elit-web</h2>
   {% for r in rep.recommendations %}
     {% if r.title is defined %}
-    <div class="rec"><div class="t">{{ loop.index }}. {{ r.title }}{% if r.priority %} <span class="agg-badge {% if 'висок' in r.priority %}p-hi{% else %}p-mid{% endif %}">{{ r.priority }}</span>{% endif %}</div><div class="mut2">{{ r.detail }}</div></div>
+    <div class="rec"><div class="t">{{ loop.index }}. {{ r.title }}{% if r.priority %} <span class="agg-badge {% if 'висок' in r.priority %}p-hi{% else %}p-mid{% endif %}">{{ r.priority }}</span>{% endif %}</div><div class="mut2">{{ r.detail }}</div>{% if r.effect %}<div class="small" style="color:var(--green);font-weight:700;margin-top:4px">Ефект: {{ r.effect }}</div>{% endif %}</div>
     {% else %}<div class="rec"><div class="mut2">{{ r }}</div></div>{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if agg and agg.per_competitor %}
+<div class="sec">
+  <h2><span class="dt"></span>Активність по конкурентах</h2>
+  <table class="rt">
+    <thead><tr><th>Конкурент</th><th>Google</th><th>Meta</th><th>Разом</th><th>Відео</th><th>Статус</th></tr></thead>
+    <tbody>
+    {% for p in agg.per_competitor %}
+      <tr>
+        <td class="d">{{ p.domain }}</td>
+        <td>{{ p.google }}</td><td>{{ p.meta }}</td><td class="d">{{ p.total }}</td>
+        <td>{% if p.has_video %}<span class="agg-badge" style="color:var(--green)">є</span>{% else %}—{% endif %}</td>
+        <td>{% if p.g_running %}<span class="pill on" style="font-size:9px">G</span>{% endif %} {% if p.m_running %}<span class="pill on" style="font-size:9px">M</span>{% endif %}{% if not p.g_running and not p.m_running %}<span class="mut">без реклами</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% set deep = [] %}
+{% for d, rec in domains.items() %}{% if rec.ai and not rec.ai.error %}{% set _ = deep.append((d, rec.ai)) %}{% endif %}{% endfor %}
+{% if deep %}
+<div class="sec">
+  <h2><span class="dt"></span>Розбір кожного конкурента «по молекулах»</h2>
+  {% for d, a in deep %}
+  <div style="border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:10px 0;background:var(--card2)">
+    <div style="font-weight:900;font-size:15px;margin-bottom:6px">{{ d }}
+      {% if a.activity_level %}<span class="agg-badge" style="margin-left:6px">{{ a.activity_level|truncate(28) }}</span>{% endif %}</div>
+    {% if a.positioning or a.utp %}<p style="margin:4px 0"><b class="mut small">ПОЗИЦІОНУВАННЯ:</b> {{ a.positioning or a.utp }}</p>{% endif %}
+    <div class="two">
+      {% if a.offers %}<div><div class="ail" style="color:var(--mute);font-size:11px;font-weight:800;text-transform:uppercase;margin:6px 0 2px">Оффери</div><ul style="margin:0;padding-left:16px">{% for x in a.offers %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if a.messaging_angles or a.messaging %}<div><div class="ail" style="color:var(--mute);font-size:11px;font-weight:800;text-transform:uppercase;margin:6px 0 2px">Меседжі / кути</div><ul style="margin:0;padding-left:16px">{% for x in (a.messaging_angles or a.messaging) %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+    </div>
+    {% if a.ad_formats %}<p style="margin:6px 0"><b class="mut small">ФОРМАТИ:</b> {{ a.ad_formats if a.ad_formats is string else a.ad_formats|join(' · ') }}</p>{% endif %}
+    {% if a.stands_out %}<p style="margin:4px 0"><b class="mut small">ВИДІЛЯЄТЬСЯ:</b> {{ a.stands_out }}</p>{% endif %}
+    {% if a.weak_spots %}<p style="margin:4px 0"><b class="mut small">СЛАБКІ МІСЦЯ:</b> {{ a.weak_spots|join('; ') if a.weak_spots is not string else a.weak_spots }}</p>{% endif %}
+    {% if a.summary %}<p style="margin:6px 0 0;color:var(--mute2)">{{ a.summary }}</p>{% endif %}
+    <div style="margin-top:6px"><a class="hlink" style="padding-left:0;color:var(--blue)" href="{{ url_for('competitor', domain=d) }}">Креативи й повний профіль →</a></div>
+  </div>
   {% endfor %}
 </div>
 {% endif %}

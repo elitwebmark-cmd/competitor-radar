@@ -80,12 +80,13 @@ def _model_candidates():
     return order
 
 
-def _call(system: str, content: list, prefill: str = "") -> str:
+def _call(system: str, content: list, prefill: str = "", max_tokens: int = None) -> str:
     """prefill — префікс відповіді асистента (напр. '{'), щоб змусити чистий JSON."""
     global _WORKING_MODEL
     headers = {"x-api-key": config.ANTHROPIC_API_KEY,
                "anthropic-version": "2023-06-01",
                "content-type": "application/json"}
+    mt = int(max_tokens or config.AI_MAX_TOKENS)
     last = ""
     for model in _model_candidates():
         # для кожної моделі: спершу з prefill, і якщо вона його не підтримує (400) — без нього
@@ -93,7 +94,7 @@ def _call(system: str, content: list, prefill: str = "") -> str:
             msgs = [{"role": "user", "content": content}]
             if pf:
                 msgs.append({"role": "assistant", "content": pf})
-            body = {"model": model, "max_tokens": config.AI_MAX_TOKENS,
+            body = {"model": model, "max_tokens": mt,
                     "system": system, "messages": msgs}
             r = requests.post(_API, headers=headers, json=body, timeout=config.AI_TIMEOUT)
             if r.status_code == 200:
@@ -256,25 +257,39 @@ _SYS_REPORT = (
     "керівництва. Відповідай ВИКЛЮЧНО валідним JSON.")
 
 _SCHEMA_REPORT = (
-    'Поверни JSON рівно з такими ключами:\n'
+    'Поверни ГЛИБОКИЙ, розгорнутий JSON рівно з такими ключами. Пиши як senior-аналітик, '
+    'багато конкретики й цифр, довгі змістовні тексти (не одне речення):\n'
     '{\n'
-    '  "executive_summary": "5-8 речень: стан ринку реклами агенцій — хто активний, '
-    'загальна інтенсивність, ключові тренди, головні висновки",\n'
-    '  "market_dynamics": "3-5 речень: динаміка й інтенсивність реклами, розподіл між Google і Meta",\n'
-    '  "players": [{"domain":"...","positioning":"як позиціонується","aggressiveness":"високий/середній/низький",'
-    '"main_offer":"головний оффер","channel_focus":"Google/Meta/обидва","stands_out":"чим виділяється"}],\n'
-    '  "offers_landscape": {"common":["оффери/меседжі, що повторюються в багатьох"],'
-    '"unique":["оффери, які має лише хтось один — цікаві ходи"]},\n'
-    '  "messaging_themes": ["домінуючі меседжі/кути на ринку загалом"],\n'
-    '  "formats_landscape": "3-5 речень: як ринок використовує формати — відео vs статичні банери vs '
-    'пошук, хто на чому сильний, де ринок недокручує",\n'
-    '  "differentiation": ["хто і чим реально виділяється на тлі решти"],\n'
-    '  "white_space": ["вільні ніші / оффери / меседжі / формати, які майже ніхто не займає — можливості для elit-web"],\n'
-    '  "threats": ["найагресивніші гравці та в чому їхня загроза"],\n'
-    '  "recommendations": [{"title":"дія для elit-web","detail":"що саме робити","priority":"висока/середня"}],\n'
-    '  "conclusion": "3-4 речення стратегічного підсумку"\n'
+    '  "executive_summary": "8-12 речень: повний стан ринку реклами агенцій — активність, '
+    'інтенсивність, хто лідирує й чому, ключові тренди, головні висновки для elit-web",\n'
+    '  "market_dynamics": "4-6 речень: динаміка й інтенсивність реклами, розподіл Google/Meta, що це означає",\n'
+    '  "intensity_analysis": "4-6 речень: хто рекламується найінтенсивніше, рівні активності '
+    '(лідери / середняки / пасивні), сигнали бюджетів",\n'
+    '  "channel_strategy": "4-6 речень: як ринок ділить Google vs Meta — хто на що ставить і чому, '
+    'де недокрут",\n'
+    '  "segments_targeting": "4-6 речень: на які сегменти/ніші/типи клієнтів таргетує ринок, '
+    'хто які сегменти зайняв, де конкуренція за аудиторію найвища",\n'
+    '  "players": [{"domain":"...","positioning":"розгорнуто як позиціонується",'
+    '"aggressiveness":"високий/середній/низький","main_offer":"головний оффер",'
+    '"messaging":"на що тиснуть","formats":"які формати/акцент","channel_focus":"Google/Meta/обидва",'
+    '"stands_out":"чим виділяється","weakness":"слабке місце"}],\n'
+    '  "positioning_map": ["кластери позиціонування ринку: напр. \'перформанс з фокусом на ROI: X, Y\'; '
+    '\'SEO за результат: Z\'; \'комплексний діджитал: ...\' — згрупуй гравців за типом позиціонування"],\n'
+    '  "offers_landscape": {"common":["оффери/меседжі, що повторюються в багатьох — з поясненням"],'
+    '"unique":["оффери, які має лише хтось один — цікаві ходи, з поясненням"],'
+    '"pricing":"2-4 речення: що видно про ціни / моделі оплати / гарантії на ринку"},\n'
+    '  "messaging_themes": [{"theme":"меседж/кут","detail":"хто використовує і чому це працює"}],\n'
+    '  "formats_landscape": "5-7 речень: як ринок використовує формати — відео vs статичні банери vs '
+    'пошук vs каруселі, хто на чому сильний, де ринок недокручує, які висновки",\n'
+    '  "differentiation": ["хто і чим реально виділяється на тлі решти — розгорнуто по кожному помітному"],\n'
+    '  "white_space": [{"title":"вільна ніша/оффер/меседж/формат","detail":"чому це можливість і як elit-web її зайняти"}],\n'
+    '  "threats": [{"who":"агресивний гравець","detail":"у чому загроза і як реагувати"}],\n'
+    '  "recommendations": [{"title":"дія для elit-web","detail":"що саме робити, конкретно",'
+    '"effect":"очікуваний ефект","priority":"висока/середня"}],\n'
+    '  "conclusion": "5-7 речень стратегічного підсумку із чіткими пріоритетами"\n'
     '}\n'
-    'У players — усі конкуренти з даних. У recommendations 4-6 пунктів.')
+    'У players — ОБОВʼЯЗКОВО всі конкуренти з даних. У messaging_themes 4-6, у white_space 4-6, '
+    'у recommendations 5-8 пунктів. Використовуй надані цифри по ринку.')
 
 
 def market_report(items: list, agg: dict = None) -> dict:
@@ -319,7 +334,7 @@ def market_report(items: list, agg: dict = None) -> dict:
                 f"{p['domain']} ({p['total']})" for p in (agg.get('top') or [])))
     content = [{"type": "text", "text": ctx + "\n\n" + _SCHEMA_REPORT}]
     try:
-        raw = _call(_SYS_REPORT, content, prefill="{")
+        raw = _call(_SYS_REPORT, content, prefill="{", max_tokens=max(config.AI_MAX_TOKENS, 6000))
     except Exception as e:
         log.exception("market_report")
         return {"error": str(e)[:200]}
